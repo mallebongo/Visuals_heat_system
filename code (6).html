@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heating System Visualizer</title>
+    <title>Advanced Heating System Visualizer</title>
     <style>
         :root {
             --bg-color: #f0f4f8;
@@ -14,6 +14,10 @@
             --border-color: #d0d0d0;
             --block-bg: #ffffff;
             --shadow-color: rgba(0,0,0,0.1);
+
+            --hot-water-color: #e74c3c;
+            --cold-water-color: #3498db;
+            --info-signal-color: #2ecc71;
         }
 
         body {
@@ -34,21 +38,23 @@
             text-align: center;
             font-size: 1.5em;
             box-shadow: 0 2px 4px var(--shadow-color);
+            z-index: 100; /* Above controls/workspace */
         }
 
         .main-container {
             display: flex;
             flex-grow: 1;
-            overflow: hidden; /* Important for layout */
+            overflow: hidden;
         }
 
         #controls {
-            width: 250px;
+            width: 280px; /* Slightly wider for new blocks */
             padding: 20px;
             background-color: #fff;
             border-right: 1px solid var(--border-color);
             box-shadow: 2px 0 5px var(--shadow-color);
             overflow-y: auto;
+            flex-shrink: 0;
         }
 
         #controls h2 {
@@ -72,12 +78,8 @@
             transition: background-color 0.3s ease, transform 0.1s ease;
         }
 
-        #controls button:hover {
-            background-color: #45c9b0;
-        }
-        #controls button:active {
-            transform: scale(0.98);
-        }
+        #controls button:hover { background-color: #45c9b0; }
+        #controls button:active { transform: scale(0.98); }
 
         #controls .connect-mode-info {
             margin-top: 15px;
@@ -86,19 +88,20 @@
             border-radius: 4px;
             font-size: 0.9em;
         }
+         #controls .connect-mode-info strong { color: var(--accent-color); }
 
         #workspace-container {
             flex-grow: 1;
-            position: relative; /* For absolute positioning of SVG and blocks */
+            position: relative;
             background-color: var(--bg-color);
-            overflow: auto; /* Allow scrolling if content overflows */
-            padding: 10px; /* Give some space around the workspace */
+            overflow: auto;
+            padding: 10px;
         }
 
         #workspace {
-            position: relative; /* Crucial for block positioning and SVG */
-            width: 2000px; /* Large scrollable area */
-            height: 1500px;
+            position: relative;
+            width: 2500px; /* Even larger workspace */
+            height: 2000px;
             background-image:
                 linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
@@ -106,20 +109,19 @@
             border: 1px solid var(--border-color);
         }
 
-
         #connection-svg {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Allows clicks to go through to blocks */
+            pointer-events: none;
         }
 
         .block {
             position: absolute;
-            min-width: 120px;
-            min-height: 60px;
+            min-width: 150px; /* Increased min-width for ports */
+            min-height: 80px; /* Increased min-height for ports */
             background-color: var(--block-bg);
             border: 2px solid var(--border-color);
             border-radius: 8px;
@@ -129,73 +131,105 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 10px;
+            padding: 15px; /* Increased padding */
             user-select: none;
             text-align: center;
             font-size: 0.9em;
-            box-sizing: border-box; /* Include padding and border in element's total width and height */
+            box-sizing: border-box;
         }
-        .block:active {
-            cursor: grabbing;
-            z-index: 1000; /* Bring to front when dragging */
-            box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
-        }
+        .block:active { cursor: grabbing; box-shadow: 5px 5px 15px rgba(0,0,0,0.2); }
 
-        .block.selected-for-connection {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 10px var(--accent-color);
-        }
-
-        .heat-pump {
-            border-color: #e74c3c; /* Reddish */
-        }
-        .heat-pump::before { content: "♨️ Heat Pump"; display: block; font-weight: bold; margin-bottom: 5px;}
-
-        .buffer {
-            border-color: #3498db; /* Blueish */
-        }
-        .buffer::before { content: "🔋 Buffer"; display: block; font-weight: bold; margin-bottom: 5px;}
-
-        .input-source {
-            border-color: #2ecc71; /* Greenish */
-        }
-        .input-source::before { content: "⚡ Input"; display: block; font-weight: bold; margin-bottom: 5px;}
-
+        /* Block type specific styling - main title handled by JS/CSS, border for type */
+        .heat-pump { border-left: 5px solid var(--hot-water-color); }
+        .buffer { border-left: 5px solid var(--primary-color); }
+        .input-source { border-left: 5px solid #f39c12; } /* Orange for generic input */
+        .heat-user { border-left: 5px solid var(--cold-water-color); }
+        .sensor { border-left: 5px solid var(--info-signal-color); }
         .text-block {
             background-color: #f9f9f9;
-            border-style: dashed;
+            border: 2px dashed var(--border-color);
             min-height: 40px;
             min-width: 100px;
-            padding: 15px;
             font-style: italic;
         }
-        .text-block::before { content: "📝 Text"; display: block; font-weight: bold; margin-bottom: 5px; font-style: normal;}
-
-
-        .block-label {
-            font-size: 0.8em;
+        
+        .block-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+        .block-label { /* For user-defined label */
+            font-size: 0.85em;
             color: #555;
+            white-space: pre-wrap;
             margin-top: 5px;
         }
 
         .delete-btn {
             position: absolute;
-            top: -8px;
-            right: -8px;
-            background-color: red;
+            top: -10px;
+            right: -10px;
+            background-color: #d9534f;
             color: white;
             border: none;
             border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
-            line-height: 20px;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            line-height: 24px;
             text-align: center;
             cursor: pointer;
-            display: none; /* Hidden by default */
+            display: none;
+            z-index: 1050; /* Above block and ports */
         }
-        .block:hover .delete-btn {
-            display: block;
+        .block:hover .delete-btn { display: block; }
+
+        /* Port Styling */
+        .port {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 1px solid #555;
+            border-radius: 50%;
+            cursor: pointer;
+            box-sizing: border-box;
+            z-index: 1; 
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .port:hover {
+            transform: scale(1.3);
+            box-shadow: 0 0 5px var(--accent-color);
+        }
+        .port.selected-for-connection {
+            border-width: 3px;
+            border-color: var(--accent-color) !important; /* Important to override other border colors */
+            transform: scale(1.4);
+        }
+
+        .port.hot-water { background-color: var(--hot-water-color); border-color: darken(var(--hot-water-color), 20%); }
+        .port.cold-water { background-color: var(--cold-water-color); border-color: darken(var(--cold-water-color), 20%); }
+        .port.data-signal { background-color: var(--info-signal-color); border-color: darken(var(--info-signal-color), 20%); }
+        
+        .port-label-tip { /* Tooltip for port label */
+            visibility: hidden;
+            width: max-content;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 5px 8px;
+            position: absolute;
+            z-index: 1060; /* Above everything */
+            bottom: 125%; /* Position above the port */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.8em;
+        }
+        .port:hover .port-label-tip {
+            visibility: visible;
+            opacity: 1;
         }
 
     </style>
@@ -203,7 +237,7 @@
 <body>
 
     <div class="header">
-        Heating System Visualizer
+        Advanced Heating System Visualizer
     </div>
 
     <div class="main-container">
@@ -211,13 +245,15 @@
             <h2>Components</h2>
             <button onclick="addBlock('heat-pump')">Add Heat Pump</button>
             <button onclick="addBlock('buffer')">Add Buffer Tank</button>
-            <button onclick="addBlock('input-source')">Add Input Source</button>
+            <button onclick="addBlock('input-source')">Add Input (e.g., Solar)</button>
+            <button onclick="addBlock('heat-user')">Add Heat User (e.g., Radiator)</button>
+            <button onclick="addBlock('sensor')">Add Sensor/Measure Point</button>
             <button onclick="addBlock('text-block')">Add Text Label</button>
 
             <h2>Connections</h2>
             <button id="connectButton" onclick="toggleConnectMode()">Start Connecting</button>
             <div id="connectModeInfo" class="connect-mode-info" style="display:none;">
-                Click two blocks to connect them.
+                Click a <strong>port</strong> on one block, then a <strong>compatible port</strong> on another.
             </div>
 
             <h2>Actions</h2>
@@ -242,130 +278,229 @@
         let connections = [];
         let nextBlockId = 0;
         let nextConnectionId = 0;
+
         let isDragging = false;
         let dragTarget = null;
-        let offsetX, offsetY;
+        let initialMouseX, initialMouseY;
+        let initialElementLeft, initialElementTop;
 
         let connectMode = false;
-        let firstBlockToConnect = null;
+        let firstPortToConnect = null; // { blockId, portId, portElement }
 
-        function getWorkspaceOffset() {
-            const rect = workspace.getBoundingClientRect();
-            const containerRect = workspaceContainer.getBoundingClientRect();
-            return {
-                x: workspace.scrollLeft - containerRect.left, // accounts for scrolling within container
-                y: workspace.scrollTop - containerRect.top    // and container's own offset
-            };
+        // --- BLOCK DEFINITIONS ---
+        const BLOCK_DEFINITIONS = {
+            'heat-pump': {
+                title: "♨️ Heat Pump",
+                ports: [
+                    { id: 'hw_out', label: 'Hot Water Out', type: 'hot-water', side: 'right', align: 0.3 },
+                    { id: 'cw_in', label: 'Cold Water In', type: 'cold-water', side: 'right', align: 0.7 },
+                    { id: 'signal_in', label: 'Control Signal In', type: 'data-signal', side: 'top', align: 0.5 },
+                ]
+            },
+            'buffer': {
+                title: "🔋 Buffer Tank",
+                ports: [
+                    { id: 'hw_in_top', label: 'Hot Water In (Top)', type: 'hot-water', side: 'left', align: 0.2 },
+                    { id: 'hw_out_top', label: 'Hot Water Out (Top)', type: 'hot-water', side: 'right', align: 0.2 },
+                    { id: 'cw_in_bottom', label: 'Cold Water In (Bottom)', type: 'cold-water', side: 'left', align: 0.8 },
+                    { id: 'cw_out_bottom', label: 'Cold Water Out (Bottom)', type: 'cold-water', side: 'right', align: 0.8 },
+                    { id: 'sensor_top', label: 'Temp Sensor Top', type: 'data-signal', side: 'top', align: 0.25 },
+                    { id: 'sensor_mid', label: 'Temp Sensor Mid', type: 'data-signal', side: 'top', align: 0.75 },
+                ]
+            },
+            'input-source': {
+                title: "⚡ Input Source",
+                ports: [
+                    { id: 'hw_out', label: 'Hot Flow Out', type: 'hot-water', side: 'right', align: 0.3 },
+                    { id: 'cw_in', label: 'Cold Flow In', type: 'cold-water', side: 'right', align: 0.7 },
+                ]
+            },
+            'heat-user': {
+                title: "🔥 Heat User",
+                ports: [
+                    { id: 'hw_in', label: 'Hot Water Supply', type: 'hot-water', side: 'left', align: 0.3 },
+                    { id: 'cw_out', label: 'Cold Water Return', type: 'cold-water', side: 'left', align: 0.7 },
+                    { id: 'demand_signal', label: 'Heat Demand Signal', type: 'data-signal', side: 'bottom', align: 0.5 },
+                ]
+            },
+            'sensor': {
+                title: "🌡️ Sensor",
+                ports: [
+                    { id: 'data_out', label: 'Measured Value Out', type: 'data-signal', side: 'right', align: 0.5 }
+                ]
+            },
+            'text-block': {
+                title: "📝 Text Label",
+                ports: [] // No ports for text block
+            }
+        };
+
+        function getPortPosition(blockElement, portDef, portElementSize = 16) {
+            const blockWidth = blockElement.offsetWidth;
+            const blockHeight = blockElement.offsetHeight;
+            const offset = portElementSize / 2;
+            let x, y;
+
+            switch (portDef.side) {
+                case 'top':    x = blockWidth * portDef.align - offset; y = -offset; break;
+                case 'bottom': x = blockWidth * portDef.align - offset; y = blockHeight - offset; break;
+                case 'left':   x = -offset; y = blockHeight * portDef.align - offset; break;
+                case 'right':  x = blockWidth - offset; y = blockHeight * portDef.align - offset; break;
+                default:       x = blockWidth / 2 - offset; y = blockHeight / 2 - offset; // Default to center if side unknown
+            }
+            return { x, y };
         }
 
         function addBlock(type) {
-            const id = `block-${nextBlockId++}`;
-            let contentText = type.replace('-', ' ');
-            contentText = contentText.charAt(0).toUpperCase() + contentText.slice(1);
-
-            if (type === 'text-block') {
-                const userText = prompt("Enter text for the label:", "My Custom Text");
-                if (userText === null) return; // User cancelled
-                contentText = userText;
-            } else {
-                 const userLabel = prompt(`Optional label for ${contentText}:`, "");
-                 if (userLabel !== null && userLabel.trim() !== "") {
-                    contentText += `\n(${userLabel})`;
-                 }
+            const definition = BLOCK_DEFINITIONS[type];
+            if (!definition) {
+                console.error("Unknown block type:", type);
+                return;
             }
 
+            const id = `block-${nextBlockId++}`;
+            
+            let userLabel = "";
+            if (type === 'text-block') {
+                userLabel = prompt("Enter text for the label:", "My Custom Text");
+                if (userLabel === null) return;
+            } else if (type === 'sensor') {
+                 userLabel = prompt(`Label for ${definition.title} (e.g., "Buffer Top Temp"):`, "");
+                 if (userLabel === null) userLabel = ""; // Allow empty if cancelled
+            } else {
+                 const defaultLabel = prompt(`Optional label for ${definition.title}:`, "");
+                 if (defaultLabel !== null && defaultLabel.trim() !== "") {
+                    userLabel = defaultLabel;
+                 }
+            }
 
             const blockDiv = document.createElement('div');
             blockDiv.id = id;
             blockDiv.className = `block ${type}`;
             
-            // Simple text display, could be more complex
-            const textNode = document.createElement('span');
-            textNode.style.whiteSpace = 'pre-wrap'; // To respect newlines
-            textNode.textContent = contentText;
-            blockDiv.appendChild(textNode);
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'block-title';
+            titleSpan.textContent = definition.title;
+            blockDiv.appendChild(titleSpan);
 
-            // Initial position (can be improved to avoid overlap)
-            const initialX = 50 + (nextBlockId % 5) * 150;
-            const initialY = 50 + Math.floor(nextBlockId / 5) * 100;
+            if (userLabel) {
+                const labelSpan = document.createElement('span');
+                labelSpan.className = 'block-label';
+                labelSpan.textContent = userLabel;
+                blockDiv.appendChild(labelSpan);
+            }
+            
+            const initialX = 50 + (blocks.length % 5) * (blockDiv.minWidth || 180); 
+            const initialY = 50 + Math.floor(blocks.length / 5) * (blockDiv.minHeight || 130);
             blockDiv.style.left = `${initialX}px`;
             blockDiv.style.top = `${initialY}px`;
 
-            // Delete button
+            // Add Delete Button
             const deleteBtn = document.createElement('span');
             deleteBtn.className = 'delete-btn';
             deleteBtn.innerHTML = '&times;';
-            deleteBtn.onclick = (e) => {
-                e.stopPropagation(); // Prevent block click/drag
-                deleteBlock(id);
-            };
+            deleteBtn.onclick = (e) => { e.stopPropagation(); deleteBlock(id); };
             blockDiv.appendChild(deleteBtn);
-
-            workspace.appendChild(blockDiv);
+            
+            workspace.appendChild(blockDiv); // Add to DOM to get offsetWidth/Height for ports
 
             const blockData = {
                 id: id,
                 element: blockDiv,
                 type: type,
-                x: initialX,
+                x: initialX, 
                 y: initialY,
-                connections: [] // Store IDs of connections attached to this block
+                ports: [], // Will store actual port elements and their data
+                connections: [] // IDs of connections linked to this block
             };
-            blocks.push(blockData);
 
-            makeDraggable(blockDiv, blockData);
-            blockDiv.addEventListener('click', () => handleBlockClick(blockData));
+            // Create and add ports
+            definition.ports.forEach(portDef => {
+                const portId = `${id}_${portDef.id}`;
+                const portElement = document.createElement('div');
+                portElement.id = portId;
+                portElement.className = `port ${portDef.type}`;
+                
+                const pos = getPortPosition(blockDiv, portDef);
+                portElement.style.left = `${pos.x}px`;
+                portElement.style.top = `${pos.y}px`;
+
+                const labelTip = document.createElement('span');
+                labelTip.className = 'port-label-tip';
+                labelTip.textContent = portDef.label;
+                portElement.appendChild(labelTip);
+
+                portElement.onclick = (e) => {
+                    e.stopPropagation(); // Prevent block drag start
+                    handlePortClick(blockData, portDef, portElement);
+                };
+                blockDiv.appendChild(portElement);
+                blockData.ports.push({ 
+                    id: portDef.id, // relative ID within block
+                    fullId: portId, // globally unique ID
+                    definition: portDef, 
+                    element: portElement,
+                    connectedTo: null // { blockId, portId } of the other end
+                });
+            });
+            
+            blocks.push(blockData);
+            makeDraggable(blockDiv, blockData); 
         }
 
         function makeDraggable(element, blockData) {
             element.addEventListener('mousedown', (e) => {
-                // Only drag with left mouse button, and not if clicking on delete button
-                if (e.button !== 0 || e.target.classList.contains('delete-btn')) return;
+                if (e.button !== 0 || e.target.classList.contains('delete-btn') || e.target.classList.contains('port')) return;
                 
+                e.preventDefault(); 
                 isDragging = true;
                 dragTarget = element;
+                dragTarget.lastDragTime = 0; 
                 
-                // Calculate offset from mouse pointer to block's top-left
-                // This considers the workspace's own scroll position
-                const workspaceRect = workspace.getBoundingClientRect();
-                offsetX = e.clientX - element.getBoundingClientRect().left;
-                offsetY = e.clientY - element.getBoundingClientRect().top;
+                initialMouseX = e.clientX;
+                initialMouseY = e.clientY;
+                initialElementLeft = dragTarget.offsetLeft; 
+                initialElementTop = dragTarget.offsetTop;   
                 
-                element.style.cursor = 'grabbing';
-                element.style.zIndex = 1000; // Bring to front
+                dragTarget.style.cursor = 'grabbing';
+                dragTarget.style.zIndex = "1000"; 
             });
         }
 
-        // Global mousemove and mouseup listeners for dragging
         document.addEventListener('mousemove', (e) => {
             if (!isDragging || !dragTarget) return;
-            e.preventDefault(); // Prevent text selection during drag
+            e.preventDefault(); 
 
-            const workspaceRect = workspace.getBoundingClientRect();
-            
-            // New position relative to the workspace div
-            let newX = e.clientX - workspaceRect.left - offsetX + workspace.scrollLeft;
-            let newY = e.clientY - workspaceRect.top - offsetY + workspace.scrollTop;
+            const deltaX = e.clientX - initialMouseX;
+            const deltaY = e.clientY - initialMouseY;
 
-            // Constrain to workspace boundaries (optional, can be removed for infinite feel)
-            newX = Math.max(0, Math.min(newX, workspace.offsetWidth - dragTarget.offsetWidth));
-            newY = Math.max(0, Math.min(newY, workspace.offsetHeight - dragTarget.offsetHeight));
+            let newX = initialElementLeft + deltaX;
+            let newY = initialElementTop + deltaY;
+
+            const blockWidth = dragTarget.offsetWidth;
+            const blockHeight = dragTarget.offsetHeight;
+            const workspaceWidth = workspace.offsetWidth; 
+            const workspaceHeight = workspace.offsetHeight;
+
+            newX = Math.max(0, Math.min(newX, workspaceWidth - blockWidth));
+            newY = Math.max(0, Math.min(newY, workspaceHeight - blockHeight));
 
             dragTarget.style.left = `${newX}px`;
             dragTarget.style.top = `${newY}px`;
 
             const blockData = blocks.find(b => b.id === dragTarget.id);
             if (blockData) {
-                blockData.x = newX;
-                blockData.y = newY;
+                blockData.x = newX; 
+                blockData.y = newY; 
                 updateConnectionsForBlock(blockData.id);
             }
         });
 
-        document.addEventListener('mouseup', (e) => {
+        document.addEventListener('mouseup', () => {
             if (isDragging && dragTarget) {
                 dragTarget.style.cursor = 'grab';
-                dragTarget.style.zIndex = ''; // Reset z-index
+                dragTarget.style.zIndex = ''; 
+                dragTarget.lastDragTime = new Date().getTime();
                 isDragging = false;
                 dragTarget = null;
             }
@@ -373,108 +508,156 @@
         
         function toggleConnectMode() {
             connectMode = !connectMode;
+            const rootStyle = getComputedStyle(document.documentElement); 
+
             if (connectMode) {
                 connectButton.textContent = 'Cancel Connecting';
-                connectButton.style.backgroundColor = var(--accent-color);
+                connectButton.style.backgroundColor = rootStyle.getPropertyValue('--accent-color').trim() || '#f5a623';
                 connectModeInfo.style.display = 'block';
                 workspace.style.cursor = 'crosshair';
-                if (firstBlockToConnect) {
-                    firstBlockToConnect.element.classList.remove('selected-for-connection');
-                    firstBlockToConnect = null;
+                if (firstPortToConnect) {
+                    firstPortToConnect.portElement.classList.remove('selected-for-connection');
+                    firstPortToConnect = null;
                 }
             } else {
                 connectButton.textContent = 'Start Connecting';
-                connectButton.style.backgroundColor = ''; // Revert to default
+                connectButton.style.backgroundColor = ''; 
                 connectModeInfo.style.display = 'none';
                 workspace.style.cursor = 'default';
-                if (firstBlockToConnect) {
-                    firstBlockToConnect.element.classList.remove('selected-for-connection');
+                if (firstPortToConnect) {
+                    firstPortToConnect.portElement.classList.remove('selected-for-connection');
+                    firstPortToConnect = null; 
                 }
-                firstBlockToConnect = null;
             }
         }
 
-        function handleBlockClick(blockData) {
+        function arePortsCompatible(port1Def, port2Def) {
+            // Basic compatibility: same type (hot-water to hot-water, etc.)
+            // More complex rules could be added (e.g. in vs out, but that's harder without defining port directionality)
+            return port1Def.type === port2Def.type;
+        }
+
+        function handlePortClick(blockData, portDef, portElement) {
             if (!connectMode) return;
+            if (new Date().getTime() - (dragTarget?.lastDragTime || 0) < 100) return; // Avoid click after drag
 
-            if (!firstBlockToConnect) {
-                firstBlockToConnect = blockData;
-                blockData.element.classList.add('selected-for-connection');
-            } else {
-                if (firstBlockToConnect.id === blockData.id) {
-                    // Clicked the same block again, deselect
-                    blockData.element.classList.remove('selected-for-connection');
-                    firstBlockToConnect = null;
-                    return;
-                }
-                // Second block selected, create connection
-                createConnection(firstBlockToConnect, blockData);
-                firstBlockToConnect.element.classList.remove('selected-for-connection');
-                // Optionally, keep connect mode active for more connections or turn it off
-                // toggleConnectMode(); // Turn off after one connection
-                firstBlockToConnect = null; // Reset for next connection
-            }
-        }
-
-        function createConnection(block1Data, block2Data) {
-            // Check if connection already exists
-            const existingConnection = connections.find(conn =>
-                (conn.from === block1Data.id && conn.to === block2Data.id) ||
-                (conn.from === block2Data.id && conn.to === block1Data.id)
-            );
-            if (existingConnection) {
-                alert("These blocks are already connected.");
+             // Check if this port is already connected
+            const portData = blockData.ports.find(p => p.fullId === portElement.id);
+            if (portData && portData.connectedTo) {
+                alert(`Port ${portDef.label} is already connected.`);
                 return;
             }
 
+            if (!firstPortToConnect) {
+                firstPortToConnect = { blockData, portDef, portElement };
+                portElement.classList.add('selected-for-connection');
+            } else {
+                // Prevent connecting to same block or same port
+                if (firstPortToConnect.blockData.id === blockData.id) {
+                    alert("Cannot connect a block to itself.");
+                     if (firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection');
+                    firstPortToConnect = null;
+                    return;
+                }
+                // Check port compatibility
+                if (!arePortsCompatible(firstPortToConnect.portDef, portDef)) {
+                    alert(`Ports are not compatible: ${firstPortToConnect.portDef.type} cannot connect to ${portDef.type}.`);
+                    return;
+                }
+                
+                const secondPortData = blockData.ports.find(p => p.fullId === portElement.id);
+                 if (secondPortData && secondPortData.connectedTo) {
+                    alert(`Port ${portDef.label} on the target block is already connected.`);
+                    return;
+                }
+
+
+                createConnection(firstPortToConnect, { blockData, portDef, portElement });
+                
+                firstPortToConnect.portElement.classList.remove('selected-for-connection');
+                firstPortToConnect = null; 
+            }
+        }
+        
+        function getPortAbsolutePosition(blockId, portFullId) {
+            const block = blocks.find(b => b.id === blockId);
+            if (!block) return null;
+            const port = block.ports.find(p => p.fullId === portFullId);
+            if (!port) return null;
+
+            const portRect = port.element.getBoundingClientRect();
+            const workspaceRect = workspace.getBoundingClientRect();
+            
+            // Position of port center relative to workspace top-left
+            const x = portRect.left - workspaceRect.left + portRect.width / 2 + workspace.scrollLeft;
+            const y = portRect.top - workspaceRect.top + portRect.height / 2 + workspace.scrollTop;
+            
+            return { x, y };
+        }
+
+        function createConnection(port1Info, port2Info) {
             const connectionId = `conn-${nextConnectionId++}`;
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.id = connectionId;
-            line.setAttribute('stroke', 'var(--text-color)');
+            
+            let strokeColor = 'var(--text-color)';
+            let strokeDashArray = "none";
+
+            // Determine line style based on port type (assuming compatible types means they are the same)
+            switch (port1Info.portDef.type) {
+                case 'hot-water':    strokeColor = 'var(--hot-water-color)'; break;
+                case 'cold-water':   strokeColor = 'var(--cold-water-color)'; break;
+                case 'data-signal':  strokeColor = 'var(--info-signal-color)'; strokeDashArray = "5,5"; break;
+            }
+
+            line.setAttribute('stroke', strokeColor);
             line.setAttribute('stroke-width', '3');
-            line.setAttribute('marker-end', 'url(#arrowhead)'); // Optional arrowhead
+            line.setAttribute('stroke-dasharray', strokeDashArray);
+            if (port1Info.portDef.type !== 'data-signal') { // No arrows for data signals for now, or make it different
+                 line.setAttribute('marker-end', 'url(#arrowhead)');
+            }
+
 
             svgCanvas.appendChild(line);
             
             const connectionData = {
                 id: connectionId,
-                from: block1Data.id,
-                to: block2Data.id,
+                type: port1Info.portDef.type,
+                fromBlockId: port1Info.blockData.id,
+                fromPortFullId: port1Info.portElement.id, // Use full port ID
+                toBlockId: port2Info.blockData.id,
+                toPortFullId: port2Info.portElement.id,   // Use full port ID
                 element: line
             };
             connections.push(connectionData);
 
-            // Store connection reference in blocks
-            block1Data.connections.push(connectionId);
-            block2Data.connections.push(connectionId);
+            // Update block's connection list and port's connectedTo status
+            port1Info.blockData.connections.push(connectionId);
+            port2Info.blockData.connections.push(connectionId);
+            
+            const p1 = port1Info.blockData.ports.find(p=>p.fullId === port1Info.portElement.id);
+            const p2 = port2Info.blockData.ports.find(p=>p.fullId === port2Info.portElement.id);
+            if(p1) p1.connectedTo = { blockId: port2Info.blockData.id, portId: port2Info.portDef.id };
+            if(p2) p2.connectedTo = { blockId: port1Info.blockData.id, portId: port1Info.portDef.id };
             
             updateConnectionLine(connectionData);
-            console.log(`Connected ${block1Data.id} to ${block2Data.id}`);
         }
 
         function updateConnectionLine(connectionData) {
-            const fromBlock = blocks.find(b => b.id === connectionData.from);
-            const toBlock = blocks.find(b => b.id === connectionData.to);
+            const pos1 = getPortAbsolutePosition(connectionData.fromBlockId, connectionData.fromPortFullId);
+            const pos2 = getPortAbsolutePosition(connectionData.toBlockId, connectionData.toPortFullId);
 
-            if (!fromBlock || !toBlock) return; // One block might have been deleted
+            if (!pos1 || !pos2 || !connectionData.element) return;
 
-            const line = connectionData.element;
-
-            // Calculate center points of the blocks
-            const x1 = fromBlock.x + fromBlock.element.offsetWidth / 2;
-            const y1 = fromBlock.y + fromBlock.element.offsetHeight / 2;
-            const x2 = toBlock.x + toBlock.element.offsetWidth / 2;
-            const y2 = toBlock.y + toBlock.element.offsetHeight / 2;
-
-            line.setAttribute('x1', x1);
-            line.setAttribute('y1', y1);
-            line.setAttribute('x2', x2);
-            line.setAttribute('y2', y2);
+            connectionData.element.setAttribute('x1', String(pos1.x));
+            connectionData.element.setAttribute('y1', String(pos1.y));
+            connectionData.element.setAttribute('x2', String(pos2.x));
+            connectionData.element.setAttribute('y2', String(pos2.y));
         }
 
         function updateConnectionsForBlock(blockId) {
             connections.forEach(conn => {
-                if (conn.from === blockId || conn.to === blockId) {
+                if (conn.fromBlockId === blockId || conn.toBlockId === blockId) {
                     updateConnectionLine(conn);
                 }
             });
@@ -487,72 +670,82 @@
             const blockData = blocks[blockIndex];
             
             // Remove associated connections
-            const connectionsToRemove = [];
             connections = connections.filter(conn => {
-                if (conn.from === blockId || conn.to === blockId) {
-                    connectionsToRemove.push(conn);
-                    svgCanvas.removeChild(conn.element); // Remove line from SVG
+                if (conn.fromBlockId === blockId || conn.toBlockId === blockId) {
+                    if (conn.element && conn.element.parentNode === svgCanvas) {
+                         svgCanvas.removeChild(conn.element);
+                    }
+                    // Clear connectedTo status on the other port
+                    const otherBlockId = conn.fromBlockId === blockId ? conn.toBlockId : conn.fromBlockId;
+                    const otherPortFullId = conn.fromBlockId === blockId ? conn.toPortFullId : conn.fromPortFullId;
+                    const otherBlock = blocks.find(b => b.id === otherBlockId);
+                    if (otherBlock) {
+                        const otherPort = otherBlock.ports.find(p => p.fullId === otherPortFullId);
+                        if (otherPort) otherPort.connectedTo = null;
+                        otherBlock.connections = otherBlock.connections.filter(cId => cId !== conn.id);
+                    }
                     return false; // Remove from connections array
                 }
                 return true;
             });
 
-            // Clean up connection references in other blocks
-            connectionsToRemove.forEach(removedConn => {
-                blocks.forEach(b => {
-                    b.connections = b.connections.filter(cId => cId !== removedConn.id);
-                });
-            });
-
-            // Remove block element from DOM
-            workspace.removeChild(blockData.element);
-            // Remove block from array
+            if (blockData.element && blockData.element.parentNode === workspace) {
+                workspace.removeChild(blockData.element);
+            }
             blocks.splice(blockIndex, 1);
-
-            console.log(`Deleted block ${blockId} and its connections.`);
         }
 
-
         function clearWorkspace() {
-            if (!confirm("Are you sure you want to clear everything?")) return;
+            if (!confirm("Are you sure you want to clear everything? This action cannot be undone.")) return;
 
-            // Remove all block elements
-            blocks.forEach(block => workspace.removeChild(block.element));
+            blocks.forEach(block => {
+                if (block.element && block.element.parentNode === workspace) {
+                    workspace.removeChild(block.element);
+                }
+            });
             blocks = [];
-            nextBlockId = 0;
+            nextBlockId = 0; 
 
-            // Remove all connection elements
-            connections.forEach(conn => svgCanvas.removeChild(conn.element));
+            connections.forEach(conn => {
+                 if (conn.element && conn.element.parentNode === svgCanvas) {
+                    svgCanvas.removeChild(conn.element);
+                 }
+            });
             connections = [];
             nextConnectionId = 0;
 
-            if (connectMode) {
-                toggleConnectMode(); // Reset connect mode
+            if (connectMode) toggleConnectMode(); 
+            if (firstPortToConnect) { // Clear any lingering selections
+                 if(firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection');
+                 firstPortToConnect = null;
             }
-            console.log("Workspace cleared.");
         }
 
-        // Optional: Add an arrowhead definition to SVG (add this once)
         function setupSvgDefs() {
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            
+            // Generic Arrowhead
             const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
             marker.setAttribute('id', 'arrowhead');
             marker.setAttribute('markerWidth', '10');
             marker.setAttribute('markerHeight', '7');
-            marker.setAttribute('refX', '0');
+            marker.setAttribute('refX', '8'); 
             marker.setAttribute('refY', '3.5');
-            marker.setAttribute('orient', 'auto');
+            marker.setAttribute('orient', 'auto-start-reverse');
             const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
             polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
-            polygon.setAttribute('fill', 'var(--text-color)');
+            // Arrowhead color will be 'context-stroke' or 'context-fill' if we want it to inherit line color.
+            // For simplicity, let's make it a bit generic or allow CSS to style it.
+            // polygon.setAttribute('fill', 'var(--text-color)'); // Or make it inherit
+            polygon.setAttribute('fill', 'currentColor'); // Inherits stroke color of the line
             marker.appendChild(polygon);
             defs.appendChild(marker);
+
             svgCanvas.appendChild(defs);
         }
 
         // Initialize
-        setupSvgDefs(); // Call this to add arrowhead definition
-        const workspaceContainer = document.getElementById('workspace-container');
+        setupSvgDefs();
 
     </script>
 </body>
