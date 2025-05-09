@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grid-Aligned Port Visualizer</title>
+    <title>Save/Load System Visualizer</title>
     <style>
-        /* CSS largely unchanged from the previous "Interactive Orthogonal Line Visualizer" */
+        /* CSS from previous "Grid-Aligned Port Visualizer" - mostly unchanged */
         :root {
             --bg-color: #f0f4f8; --primary-color: #4a90e2; --secondary-color: #50e3c2;
             --accent-color: #f5a623; --text-color: #333; --border-color: #d0d0d0;
@@ -20,19 +20,25 @@
         #controls { width: 300px; padding: 20px; background-color: #fff; border-right: 1px solid var(--border-color); box-shadow: 2px 0 5px var(--shadow-color); overflow-y: auto; flex-shrink: 0; }
         #controls h2, #controls h3 { margin-top: 20px; margin-bottom: 10px; color: var(--primary-color); border-bottom: 2px solid var(--secondary-color); padding-bottom: 8px; }
         #controls h2:first-child { margin-top: 0; }
-        #controls button { display: block; width: 100%; padding: 10px 15px; margin-bottom: 8px; background-color: var(--secondary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.95em; transition: background-color 0.3s ease, transform 0.1s ease; }
-        #controls button.special-action { background-color: var(--accent-color); }
-        #controls button:hover { background-color: #45c9b0; }
-        #controls button.special-action:hover { background-color: #d8931e; }
-        #controls button:active { transform: scale(0.98); }
+        #controls button, #controls label.button-like { /* Style label like a button */
+            display: block; width: 100%; padding: 10px 15px; margin-bottom: 8px;
+            background-color: var(--secondary-color); color: white; border: none;
+            border-radius: 5px; cursor: pointer; font-size: 0.95em; text-align: center;
+            transition: background-color 0.3s ease, transform 0.1s ease; box-sizing: border-box;
+        }
+        #controls button.special-action, #controls label.button-like.special-action { background-color: var(--accent-color); }
+        #controls button:hover, #controls label.button-like:hover { background-color: #45c9b0; }
+        #controls button.special-action:hover, #controls label.button-like.special-action:hover { background-color: #d8931e; }
+        #controls button:active, #controls label.button-like:active { transform: scale(0.98); }
+        #controls input[type="file"] { display: none; /* Hide actual file input */ }
+
         #controls .connect-mode-info { margin-top: 15px; padding: 10px; background-color: #eef; border-radius: 4px; font-size: 0.9em; }
         #controls .connect-mode-info strong { color: var(--accent-color); }
         #workspace-container { flex-grow: 1; position: relative; background-color: var(--bg-color); overflow: auto; padding: 10px; }
         #workspace { position: relative; width: 3000px; height: 2500px; background-image: linear-gradient(var(--grid-line-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line-color) 1px, transparent 1px); background-size: var(--grid-size) var(--grid-size); border: 1px solid var(--border-color); }
-        #connection-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; /* pointer-events: none; by default */ }
+        #connection-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         #connection-svg path { fill: none; cursor: pointer; transition: stroke-width 0.1s; }
         #connection-svg path:hover { stroke-width: calc(var(--original-stroke-width, 3px) + 2px); }
-        /* Selected connection style will be applied via JS for more control */
 
         .line-handle { fill: var(--accent-color); stroke: white; stroke-width: 1.5px; cursor: move; r: 7px; transition: r 0.1s; }
         .line-handle:hover { r: 9px; }
@@ -64,7 +70,7 @@
     </style>
 </head>
 <body>
-    <div class="header">Grid-Aligned Port Visualizer</div>
+    <div class="header">Save/Load System Visualizer</div>
     <div class="main-container">
         <div id="controls">
             <h2>Standard Components</h2>
@@ -83,6 +89,13 @@
             <button id="editLineButton" onclick="toggleLineEditMode()">Edit Lines</button>
             <div id="connectModeInfo" class="connect-mode-info" style="display:none;">Click a <strong>port</strong>, then a <strong>compatible port</strong>.</div>
             <div id="lineEditModeInfo" class="connect-mode-info" style="display:none;">Click a line to select. Drag orange handles to reshape.</div>
+            
+            <h2>File</h2>
+            <button onclick="saveLayout()">Save Layout</button>
+            <label for="loadLayoutInput" class="button-like">Load Layout</label>
+            <input type="file" id="loadLayoutInput" accept=".json" onchange="loadLayout(event)">
+
+
             <h2>Actions</h2>
             <button onclick="clearWorkspace()">Clear Workspace</button>
         </div>
@@ -92,11 +105,11 @@
     </div>
     <div id="blockEditorModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h2>Create Custom Block</h2><span class="close-button" onclick="closeBlockEditor()">&times;</span></div>
+            <div class="modal-header"><h2>Create Custom Block</h2><span class="close-button" onclick="closeBlockEditor()">×</span></div>
             <div class="form-group"><label for="customBlockTitleInput">Block Title:</label><input type="text" id="customBlockTitleInput"></div>
             <div class="form-group"><label for="customBlockTypeIDInput">Block Type ID:</label><input type="text" id="customBlockTypeIDInput"></div>
-            <div class="form-group"><label for="customBlockWidthInput">Width (grid units):</label><input type="number" id="customBlockWidthInput" value="8" min="2" step="1"></div>
-            <div class="form-group"><label for="customBlockHeightInput">Height (grid units):</label><input type="number" id="customBlockHeightInput" value="5" min="2" step="1"></div>
+            <div class="form-group"><label for="customBlockWidthInput">Width (grid units):</label><input type="number" id="customBlockWidthInput" value="8" min="1" step="1"></div>
+            <div class="form-group"><label for="customBlockHeightInput">Height (grid units):</label><input type="number" id="customBlockHeightInput" value="5" min="1" step="1"></div>
             <h3>Ports:</h3><div id="customPortsContainer"></div>
             <button onclick="addPortToEditorConfig()" style="margin-top:10px; background-color: var(--primary-color);">Add Port</button>
             <hr style="margin: 20px 0;"><button onclick="saveCustomBlock()" style="background-color: var(--info-signal-color); width:auto; padding:10px 20px;">Save</button>
@@ -124,7 +137,7 @@
         const customBlockButtonsContainer = document.getElementById('customBlockButtonsContainer');
 
         let blocks = []; let connections = [];
-        let nextBlockId = 0; let nextConnectionId = 0;
+        let nextBlockId = 0; let nextConnectionId = 0; // These will be restored from save file
         let isDragging = false; let dragTarget = null;
         let initialMouseX, initialMouseY, initialElementLeft, initialElementTop;
         
@@ -133,7 +146,7 @@
         let selectedConnection = null;
         let draggingHandle = null;
 
-        const PREDEFINED_BLOCK_DEFINITIONS = {
+        const PREDEFINED_BLOCK_DEFINITIONS = { /* ... same as before ... */
             'heat-pump': { title: "♨️ Heat Pump", width: 8, height: 5, ports: [ { id: 'hw_out', label: 'Hot Out', type: 'hot-water', side: 'right', align: 1 }, { id: 'cw_in', label: 'Cold In', type: 'cold-water', side: 'right', align: 3 }, { id: 'power_in', label: 'Power In', type: 'power', side: 'bottom', align: 3 }, { id: 'signal_in', label: 'Control In', type: 'data-signal', side: 'top', align: 3 }, ] },
             'buffer': { title: "🔋 Buffer Tank", width: 6, height: 8, ports: [ { id: 'hw_in_top', label: 'Hot In', type: 'hot-water', side: 'left', align: 1 }, { id: 'hw_out_top', label: 'Hot Out', type: 'hot-water', side: 'right', align: 1 }, { id: 'cw_in_bottom', label: 'Cold In', type: 'cold-water', side: 'left', align: 6 }, { id: 'cw_out_bottom', label: 'Cold Out', type: 'cold-water', side: 'right', align: 6 }, ] },
             'input-source': { title: "⚡ Input Source", width: 6, height: 3, ports: [ { id: 'hw_out', label: 'Hot Out', type: 'hot-water', side: 'right', align: 1 } ] },
@@ -145,219 +158,151 @@
         let userDefinedBlockDefinitions = {};
         function getBlockDefinition(type) { return PREDEFINED_BLOCK_DEFINITIONS[type] || userDefinedBlockDefinitions[type]; }
 
-        function openBlockEditor() {
-            blockEditorModal.style.display = "flex"; customBlockTitleInput.value = ""; customBlockTypeIDInput.value = "";
-            customBlockWidthInput.value = 8; customBlockHeightInput.value = 5;
-            customPortsContainer.innerHTML = ""; addPortToEditorConfig();
-            // Trigger update for align max based on default width/height
-            const firstPortRow = customPortsContainer.querySelector('.port-editor-row');
-            if (firstPortRow) updateAlignMax(firstPortRow.querySelector('.port-side-select'));
-        }
+        // Block Editor, addBlock, makeDraggable, mousemove, mouseup, toggle modes, etc. - same as previous
+        function openBlockEditor() { blockEditorModal.style.display = "flex"; customBlockTitleInput.value = ""; customBlockTypeIDInput.value = ""; customBlockWidthInput.value = 8; customBlockHeightInput.value = 5; customPortsContainer.innerHTML = ""; addPortToEditorConfig(); const firstPortRow = customPortsContainer.querySelector('.port-editor-row'); if (firstPortRow) updateAlignMax(firstPortRow.querySelector('.port-side-select')); }
         function closeBlockEditor() { blockEditorModal.style.display = "none"; }
-
-        function updateAlignMax(sideSelectElement) {
-            const portRow = sideSelectElement.closest('.port-editor-row');
-            const alignInput = portRow.querySelector('.port-align-input');
-            const side = sideSelectElement.value;
-            const blockWidth = parseInt(customBlockWidthInput.value) || 8;
-            const blockHeight = parseInt(customBlockHeightInput.value) || 5;
-            let maxAlign;
-            if (side === 'top' || side === 'bottom') maxAlign = blockWidth - 1;
-            else maxAlign = blockHeight - 1;
-            alignInput.max = maxAlign;
-            if (parseInt(alignInput.value) > maxAlign) alignInput.value = maxAlign;
-            if (parseInt(alignInput.value) < 0) alignInput.value = 0;
-        }
-
-        function addPortToEditorConfig() {
-            const portRow = document.createElement('div'); portRow.className = 'port-editor-row';
-            // Added onchange to side select to update align max
-            portRow.innerHTML = `
-                <input type="text" placeholder="Port Label" class="port-label-input">
-                <select class="port-type-select"> <option value="hot-water">Hot Water</option><option value="cold-water">Cold Water</option> <option value="data-signal">Data Signal</option><option value="power">Power</option> </select>
-                <select class="port-side-select" onchange="updateAlignMax(this)"> <option value="top">Top</option><option value="bottom">Bottom</option> <option value="left">Left</option><option value="right">Right</option> </select>
-                <input type="number" placeholder="Align (Grid Index)" class="port-align-input" min="0" step="1" value="0">
-                <button onclick="this.parentElement.remove()">X</button>
-            `;
-            customPortsContainer.appendChild(portRow);
-            updateAlignMax(portRow.querySelector('.port-side-select')); // Set initial max
-        }
-        // Add event listeners to width/height inputs to update all align max values
-        customBlockWidthInput.addEventListener('input', () => {
-            customPortsContainer.querySelectorAll('.port-side-select').forEach(sel => updateAlignMax(sel));
-        });
-        customBlockHeightInput.addEventListener('input', () => {
-            customPortsContainer.querySelectorAll('.port-side-select').forEach(sel => updateAlignMax(sel));
-        });
-
-        function saveCustomBlock() {
-            const title = customBlockTitleInput.value.trim(); const typeId = customBlockTypeIDInput.value.trim().replace(/\s+/g, '_').toLowerCase();
-            const width = parseInt(customBlockWidthInput.value); const height = parseInt(customBlockHeightInput.value);
-            if (!title || !typeId) { alert("Title and Type ID required."); return; }
-            if (getBlockDefinition(typeId)) { alert(`ID "${typeId}" already exists.`); return; }
-            if (isNaN(width) || width < 1 || isNaN(height) || height < 1) { alert("Width/Height must be at least 1 grid unit."); return;} // Min 1 for ports
-            
-            const ports = []; let portIdCounter = 0;
-            for (const row of customPortsContainer.querySelectorAll('.port-editor-row')) {
-                const label = row.querySelector('.port-label-input').value.trim();
-                const type = row.querySelector('.port-type-select').value;
-                const side = row.querySelector('.port-side-select').value;
-                const align = parseInt(row.querySelector('.port-align-input').value);
-                if (!label) { alert("All ports need a label."); return; }
-                if (isNaN(align) || align < 0 ) { alert("Port align index non-negative."); return; }
-                let maxAlign = (side === 'top' || side === 'bottom') ? width - 1 : height - 1;
-                if (align > maxAlign) { alert(`Port align index ${align} too large for side ${side} (max ${maxAlign}).`); return; }
-                ports.push({ id: `cp_${portIdCounter++}`, label, type, side, align });
-            }
-            userDefinedBlockDefinitions[typeId] = { title, width, height, ports, isCustom: true };
-            updateCustomBlockButtons(); closeBlockEditor(); alert(`Block "${title}" saved!`);
-        }
+        function updateAlignMax(sideSelectElement) { const portRow = sideSelectElement.closest('.port-editor-row'); const alignInput = portRow.querySelector('.port-align-input'); const side = sideSelectElement.value; const blockWidth = parseInt(customBlockWidthInput.value) || 8; const blockHeight = parseInt(customBlockHeightInput.value) || 5; let maxAlign; if (side === 'top' || side === 'bottom') maxAlign = blockWidth - 1; else maxAlign = blockHeight - 1; alignInput.max = maxAlign < 0 ? 0 : maxAlign; if (parseInt(alignInput.value) > maxAlign) alignInput.value = maxAlign < 0 ? 0 : maxAlign; if (parseInt(alignInput.value) < 0) alignInput.value = 0; }
+        function addPortToEditorConfig() { const portRow = document.createElement('div'); portRow.className = 'port-editor-row'; portRow.innerHTML = ` <input type="text" placeholder="Port Label" class="port-label-input"> <select class="port-type-select"> <option value="hot-water">Hot Water</option><option value="cold-water">Cold Water</option> <option value="data-signal">Data Signal</option><option value="power">Power</option> </select> <select class="port-side-select" onchange="updateAlignMax(this)"> <option value="top">Top</option><option value="bottom">Bottom</option> <option value="left">Left</option><option value="right">Right</option> </select> <input type="number" placeholder="Align (Grid Index)" class="port-align-input" min="0" step="1" value="0"> <button onclick="this.parentElement.remove()">X</button> `; customPortsContainer.appendChild(portRow); updateAlignMax(portRow.querySelector('.port-side-select')); }
+        customBlockWidthInput.addEventListener('input', () => { customPortsContainer.querySelectorAll('.port-side-select').forEach(sel => updateAlignMax(sel)); });
+        customBlockHeightInput.addEventListener('input', () => { customPortsContainer.querySelectorAll('.port-side-select').forEach(sel => updateAlignMax(sel)); });
+        function saveCustomBlock() { const title = customBlockTitleInput.value.trim(); const typeId = customBlockTypeIDInput.value.trim().replace(/\s+/g, '_').toLowerCase(); const width = parseInt(customBlockWidthInput.value); const height = parseInt(customBlockHeightInput.value); if (!title || !typeId) { alert("Title and Type ID required."); return; } if (PREDEFINED_BLOCK_DEFINITIONS[typeId] || userDefinedBlockDefinitions[typeId]) { alert(`ID "${typeId}" already exists.`); return; } if (isNaN(width) || width < 1 || isNaN(height) || height < 1) { alert("Width/Height must be at least 1 grid unit."); return;} const ports = []; let portIdCounter = 0; for (const row of customPortsContainer.querySelectorAll('.port-editor-row')) { const label = row.querySelector('.port-label-input').value.trim(); const type = row.querySelector('.port-type-select').value; const side = row.querySelector('.port-side-select').value; const align = parseInt(row.querySelector('.port-align-input').value); if (!label) { alert("All ports need a label."); return; } if (isNaN(align) || align < 0 ) { alert("Port align index non-negative."); return; } let maxAlign = (side === 'top' || side === 'bottom') ? width - 1 : height - 1; if (align > maxAlign) { alert(`Port align index ${align} invalid for side ${side} (max ${maxAlign}).`); return; } ports.push({ id: `cp_${portIdCounter++}`, label, type, side, align }); } userDefinedBlockDefinitions[typeId] = { title, width, height, ports, isCustom: true }; updateCustomBlockButtons(); closeBlockEditor(); alert(`Block "${title}" saved!`); }
         function updateCustomBlockButtons() { customBlockButtonsContainer.innerHTML = ""; for (const typeId in userDefinedBlockDefinitions) { const def = userDefinedBlockDefinitions[typeId]; const btn = document.createElement('button'); btn.textContent = `Add ${def.title}`; btn.onclick = () => addBlock(typeId); customBlockButtonsContainer.appendChild(btn); } }
-        
         function snapToGrid(value) { return Math.round(value / GRID_SIZE) * GRID_SIZE; }
-
-        function getPortPixelPositionOnBlock(blockDef, portDef, portElementSize = 16) {
-            const blockWidthPx = blockDef.width * GRID_SIZE;
-            const blockHeightPx = blockDef.height * GRID_SIZE;
-            const portVisualOffset = portElementSize / 2;
-            const portConnectionOffset = GRID_SIZE / 2; // Connection point is half a grid unit out from visual edge
-
-            let cx, cy; // Connection point x, y relative to block's top-left (0,0)
-            let displayX, displayY; // Visual dot x, y relative to block's top-left
-
-            switch (portDef.side) {
-                case 'top':
-                    // Align is X grid index. Connection point X is center of that grid cell.
-                    cx = portDef.align * GRID_SIZE + GRID_SIZE / 2;
-                    cy = -portConnectionOffset; // Connection point offset upwards
-                    displayX = cx - portVisualOffset; // Center the dot visually
-                    displayY = 0 - portVisualOffset;  // Dot on the top edge
-                    break;
-                case 'bottom':
-                    cx = portDef.align * GRID_SIZE + GRID_SIZE / 2;
-                    cy = blockHeightPx + portConnectionOffset;
-                    displayX = cx - portVisualOffset;
-                    displayY = blockHeightPx - portVisualOffset; // Dot on bottom edge
-                    break;
-                case 'left':
-                    cx = -portConnectionOffset;
-                    // Align is Y grid index. Connection point Y is center of that grid cell.
-                    cy = portDef.align * GRID_SIZE + GRID_SIZE / 2;
-                    displayX = 0 - portVisualOffset; // Dot on left edge
-                    displayY = cy - portVisualOffset;
-                    break;
-                case 'right':
-                    cx = blockWidthPx + portConnectionOffset;
-                    cy = portDef.align * GRID_SIZE + GRID_SIZE / 2;
-                    displayX = blockWidthPx - portVisualOffset; // Dot on right edge
-                    displayY = cy - portVisualOffset;
-                    break;
-                default:
-                    cx = blockWidthPx / 2; cy = blockHeightPx / 2; // Fallback
-                    displayX = cx - portVisualOffset; displayY = cy - portVisualOffset;
-            }
-            return { x: cx, y: cy, displayX, displayY };
-        }
-        
-        function addBlock(type) { /* ... same structure, uses new getPortPixelPositionOnBlock ... */
-            const definition = getBlockDefinition(type); if (!definition) { console.error("Unknown block type:", type); return; } const id = `block-${nextBlockId++}`; let userLabel = ""; if (type === 'text-block') { userLabel = prompt("Label:", "My Text"); if (userLabel === null) return; } else if (type !== 'power-source' && !definition.isCustom && (definition.ports || []).length > 0) { const defaultLabel = prompt(`Label for ${definition.title}:`, ""); if (defaultLabel !== null && defaultLabel.trim() !== "") userLabel = defaultLabel; } const blockDiv = document.createElement('div'); blockDiv.id = id; blockDiv.className = `block ${type} ${definition.isCustom ? 'custom-block' : ''}`; blockDiv.style.width = `${definition.width * GRID_SIZE}px`; blockDiv.style.height = `${definition.height * GRID_SIZE}px`; const titleSpan = document.createElement('span'); titleSpan.className = 'block-title'; titleSpan.textContent = definition.title; blockDiv.appendChild(titleSpan); if (userLabel) { const labelSpan = document.createElement('span'); labelSpan.className = 'block-label'; labelSpan.textContent = userLabel; blockDiv.appendChild(labelSpan); } const initialX = snapToGrid(50 + (blocks.length % 6) * (definition.width + 2) * GRID_SIZE); const initialY = snapToGrid(50 + Math.floor(blocks.length / 6) * (definition.height + 2) * GRID_SIZE); blockDiv.style.left = `${initialX}px`; blockDiv.style.top = `${initialY}px`; const deleteBtn = document.createElement('span'); deleteBtn.className = 'delete-btn'; deleteBtn.innerHTML = '&times;'; deleteBtn.onclick = (e) => { e.stopPropagation(); deleteBlock(id); }; blockDiv.appendChild(deleteBtn); workspace.appendChild(blockDiv); const blockData = { id, element: blockDiv, type, definition, x: initialX, y: initialY, ports: [], connections: [] }; (definition.ports || []).forEach(portDef => { const portId = `${id}_${portDef.id}`; const portElement = document.createElement('div'); portElement.id = portId; portElement.className = `port ${portDef.type}`; const pos = getPortPixelPositionOnBlock(definition, portDef); portElement.style.left = `${pos.displayX}px`; portElement.style.top = `${pos.displayY}px`; const labelTip = document.createElement('span'); labelTip.className = 'port-label-tip'; labelTip.textContent = portDef.label; portElement.appendChild(labelTip); portElement.onclick = (e) => { e.stopPropagation(); handlePortClick(blockData, portDef, portElement); }; blockDiv.appendChild(portElement); blockData.ports.push({ id: portDef.id, fullId: portId, definition: portDef, element: portElement, connectedTo: null }); }); blocks.push(blockData); makeDraggable(blockDiv, blockData);
-        }
-        function makeDraggable(element, blockData) { /* ... same ... */ element.addEventListener('mousedown', (e) => { if (e.button !== 0 || e.target.classList.contains('delete-btn') || e.target.classList.contains('port')) return; e.preventDefault(); isDragging = true; dragTarget = element; dragTarget.lastDragTime = 0; initialMouseX = e.clientX; initialMouseY = e.clientY; initialElementLeft = dragTarget.offsetLeft; initialElementTop = dragTarget.offsetTop; dragTarget.style.cursor = 'grabbing'; dragTarget.style.zIndex = "1000"; dragTarget.style.transition = 'none'; }); }
-        
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging && dragTarget) { /* Block dragging ... */
-                e.preventDefault(); const deltaX = e.clientX - initialMouseX, deltaY = e.clientY - initialMouseY; let newX = initialElementLeft + deltaX, newY = initialElementTop + deltaY;
-                dragTarget.style.left = `${newX}px`; dragTarget.style.top = `${newY}px`;
-                const blockData = blocks.find(b => b.id === dragTarget.id); if (blockData) { blockData.x = newX; blockData.y = newY; updateConnectionsForBlock(blockData.id); }
-            } else if (draggingHandle) { /* Handle dragging ... */
-                e.preventDefault();
-                const { connection, handleIndex } = draggingHandle;
-                const s = getPortAbsoluteConnectionPoint(connection.fromBlockId, connection.fromPortFullId);
-                const e_port = getPortAbsoluteConnectionPoint(connection.toBlockId, connection.toPortFullId); // For end port side
-                const workspaceRect = workspace.getBoundingClientRect();
-                let mouseX = snapToGrid(e.clientX - workspaceRect.left + workspaceContainer.scrollLeft);
-                let mouseY = snapToGrid(e.clientY - workspaceRect.top + workspaceContainer.scrollTop);
-
-                if (handleIndex === 0) { // Dragging IP1
-                    if (s.side === 'left' || s.side === 'right') { // Initial segment is Horizontal from S
-                        connection.inflectionPoints[0].x = mouseX;
-                        connection.inflectionPoints[1].x = mouseX; // IP2.x follows IP1.x
-                    } else { // Initial segment is Vertical from S
-                        connection.inflectionPoints[0].y = mouseY;
-                        connection.inflectionPoints[1].y = mouseY; // IP2.y follows IP1.y
-                    }
-                } else if (handleIndex === 1) { // Dragging IP2
-                    // IP2's movement is constrained by IP1 and the end port's orientation
-                    if (s.side === 'left' || s.side === 'right') { // S exits H -> P1(x,s.y)-P2(x,y)-P3(e.x,y)-E
-                        connection.inflectionPoints[1].y = mouseY;
-                        // connection.inflectionPoints[0].y is s.y (fixed by start port)
-                    } else { // S exits V -> P1(s.x,y)-P2(x,y)-P3(x,e.y)-E
-                        connection.inflectionPoints[1].x = mouseX;
-                        // connection.inflectionPoints[0].x is s.x (fixed by start port)
-                    }
-                }
-                calculateAndDrawPath(connection, false); 
-                updateLineHandles(connection);
-            }
-        });
-        document.addEventListener('mouseup', () => { /* ... same ... */ if (isDragging && dragTarget) { dragTarget.style.cursor = 'grab'; dragTarget.style.zIndex = ''; dragTarget.lastDragTime = new Date().getTime(); const blockData = blocks.find(b => b.id === dragTarget.id); if (blockData) { blockData.x = snapToGrid(dragTarget.offsetLeft); blockData.y = snapToGrid(dragTarget.offsetTop); dragTarget.style.left = `${blockData.x}px`; dragTarget.style.top = `${blockData.y}px`; updateConnectionsForBlock(blockData.id); } dragTarget.style.transition = 'left 0.1s ease-out, top 0.1s ease-out'; isDragging = false; dragTarget = null; } if (draggingHandle) { draggingHandle = null; } });
-
-        function toggleConnectMode() { /* ... same ... */ connectMode = !connectMode; if (connectMode) { setLineEditMode(false); connectButton.textContent = 'Cancel Connecting Ports'; connectButton.style.backgroundColor = 'var(--accent-color)'; connectModeInfo.style.display = 'block'; workspace.style.cursor = 'crosshair'; if (firstPortToConnect) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } } else { connectButton.textContent = 'Connect Ports'; connectButton.style.backgroundColor = ''; connectModeInfo.style.display = 'none'; workspace.style.cursor = 'default'; if (firstPortToConnect) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } } }
+        function getPortPixelPositionOnBlock(blockDef, portDef, portElementSize = 16) { const blockWidthPx = blockDef.width * GRID_SIZE; const blockHeightPx = blockDef.height * GRID_SIZE; const portVisualOffset = portElementSize / 2; const portConnectionOffset = GRID_SIZE / 2; let cx, cy; let displayX, displayY; switch (portDef.side) { case 'top': cx = portDef.align * GRID_SIZE + GRID_SIZE / 2; cy = -portConnectionOffset; displayX = cx - portVisualOffset; displayY = 0 - portVisualOffset; break; case 'bottom': cx = portDef.align * GRID_SIZE + GRID_SIZE / 2; cy = blockHeightPx + portConnectionOffset; displayX = cx - portVisualOffset; displayY = blockHeightPx - portVisualOffset; break; case 'left': cx = -portConnectionOffset; cy = portDef.align * GRID_SIZE + GRID_SIZE / 2; displayX = 0 - portVisualOffset; displayY = cy - portVisualOffset; break; case 'right': cx = blockWidthPx + portConnectionOffset; cy = portDef.align * GRID_SIZE + GRID_SIZE / 2; displayX = blockWidthPx - portVisualOffset; displayY = cy - portVisualOffset; break; default: cx = blockWidthPx / 2; cy = blockHeightPx / 2; displayX = cx - portVisualOffset; displayY = cy - portVisualOffset; } return { x: cx, y: cy, displayX, displayY }; }
+        function addBlock(type, loadedBlockData = null) { const definition = getBlockDefinition(type); if (!definition) { console.error("Unknown block type:", type); return null; } const id = loadedBlockData ? loadedBlockData.id : `block-${nextBlockId++}`; let userLabel = loadedBlockData ? loadedBlockData.userLabel : ""; if (!loadedBlockData && type === 'text-block') { userLabel = prompt("Label:", "My Text"); if (userLabel === null) return null; } else if (!loadedBlockData && type !== 'power-source' && !definition.isCustom && (definition.ports || []).length > 0) { const defaultLabel = prompt(`Label for ${definition.title}:`, ""); if (defaultLabel !== null && defaultLabel.trim() !== "") userLabel = defaultLabel; } const blockDiv = document.createElement('div'); blockDiv.id = id; blockDiv.className = `block ${type} ${definition.isCustom ? 'custom-block' : ''}`; blockDiv.style.width = `${definition.width * GRID_SIZE}px`; blockDiv.style.height = `${definition.height * GRID_SIZE}px`; const titleSpan = document.createElement('span'); titleSpan.className = 'block-title'; titleSpan.textContent = definition.title; blockDiv.appendChild(titleSpan); if (userLabel) { const labelSpan = document.createElement('span'); labelSpan.className = 'block-label'; labelSpan.textContent = userLabel; blockDiv.appendChild(labelSpan); } const initialX = loadedBlockData ? loadedBlockData.x : snapToGrid(50 + (blocks.length % 6) * (definition.width + 2) * GRID_SIZE); const initialY = loadedBlockData ? loadedBlockData.y : snapToGrid(50 + Math.floor(blocks.length / 6) * (definition.height + 2) * GRID_SIZE); blockDiv.style.left = `${initialX}px`; blockDiv.style.top = `${initialY}px`; const deleteBtn = document.createElement('span'); deleteBtn.className = 'delete-btn'; deleteBtn.innerHTML = '×'; deleteBtn.onclick = (e) => { e.stopPropagation(); deleteBlock(id); }; blockDiv.appendChild(deleteBtn); workspace.appendChild(blockDiv); const blockData = { id, element: blockDiv, type, definition, x: initialX, y: initialY, ports: [], connections: [], userLabel }; (definition.ports || []).forEach(portDef => { const portId = `${id}_${portDef.id}`; const portElement = document.createElement('div'); portElement.id = portId; portElement.className = `port ${portDef.type}`; const pos = getPortPixelPositionOnBlock(definition, portDef); portElement.style.left = `${pos.displayX}px`; portElement.style.top = `${pos.displayY}px`; const labelTip = document.createElement('span'); labelTip.className = 'port-label-tip'; labelTip.textContent = portDef.label; portElement.appendChild(labelTip); portElement.onclick = (e) => { e.stopPropagation(); handlePortClick(blockData, portDef, portElement); }; blockDiv.appendChild(portElement); blockData.ports.push({ id: portDef.id, fullId: portId, definition: portDef, element: portElement, connectedTo: null }); }); blocks.push(blockData); if (!loadedBlockData) makeDraggable(blockDiv, blockData); else blockData.element.style.transition = 'none'; /* No snap anim on load */ return blockData; }
+        function makeDraggable(element, blockData) { element.addEventListener('mousedown', (e) => { if (e.button !== 0 || e.target.classList.contains('delete-btn') || e.target.classList.contains('port')) return; e.preventDefault(); isDragging = true; dragTarget = element; dragTarget.lastDragTime = 0; initialMouseX = e.clientX; initialMouseY = e.clientY; initialElementLeft = dragTarget.offsetLeft; initialElementTop = dragTarget.offsetTop; dragTarget.style.cursor = 'grabbing'; dragTarget.style.zIndex = "1000"; dragTarget.style.transition = 'none'; }); }
+        document.addEventListener('mousemove', (e) => { if (isDragging && dragTarget) { e.preventDefault(); const deltaX = e.clientX - initialMouseX, deltaY = e.clientY - initialMouseY; let newX = initialElementLeft + deltaX, newY = initialElementTop + deltaY; dragTarget.style.left = `${newX}px`; dragTarget.style.top = `${newY}px`; const blockData = blocks.find(b => b.id === dragTarget.id); if (blockData) { blockData.x = newX; blockData.y = newY; updateConnectionsForBlock(blockData.id); } } else if (draggingHandle) { e.preventDefault(); const { connection, handleIndex } = draggingHandle; const s = getPortAbsoluteConnectionPoint(connection.fromBlockId, connection.fromPortFullId); const workspaceRect = workspace.getBoundingClientRect(); let mouseX = snapToGrid(e.clientX - workspaceRect.left + workspaceContainer.scrollLeft); let mouseY = snapToGrid(e.clientY - workspaceRect.top + workspaceContainer.scrollTop); if (handleIndex === 0) { if (s.side === 'left' || s.side === 'right') { connection.inflectionPoints[0].x = mouseX; connection.inflectionPoints[1].x = mouseX; } else { connection.inflectionPoints[0].y = mouseY; connection.inflectionPoints[1].y = mouseY; } } else if (handleIndex === 1) { if (s.side === 'left' || s.side === 'right') { connection.inflectionPoints[1].y = mouseY; } else { connection.inflectionPoints[1].x = mouseX; } } calculateAndDrawPath(connection, false); updateLineHandles(connection); } });
+        document.addEventListener('mouseup', () => { if (isDragging && dragTarget) { dragTarget.style.cursor = 'grab'; dragTarget.style.zIndex = ''; dragTarget.lastDragTime = new Date().getTime(); const blockData = blocks.find(b => b.id === dragTarget.id); if (blockData) { blockData.x = snapToGrid(dragTarget.offsetLeft); blockData.y = snapToGrid(dragTarget.offsetTop); dragTarget.style.left = `${blockData.x}px`; dragTarget.style.top = `${blockData.y}px`; updateConnectionsForBlock(blockData.id); } dragTarget.style.transition = 'left 0.1s ease-out, top 0.1s ease-out'; isDragging = false; dragTarget = null; } if (draggingHandle) { draggingHandle = null; } });
+        function toggleConnectMode() { connectMode = !connectMode; if (connectMode) { setLineEditMode(false); connectButton.textContent = 'Cancel Connecting Ports'; connectButton.style.backgroundColor = 'var(--accent-color)'; connectModeInfo.style.display = 'block'; workspace.style.cursor = 'crosshair'; if (firstPortToConnect) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } } else { connectButton.textContent = 'Connect Ports'; connectButton.style.backgroundColor = ''; connectModeInfo.style.display = 'none'; workspace.style.cursor = 'default'; if (firstPortToConnect) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } } }
         function toggleLineEditMode() { setLineEditMode(!lineEditMode); }
         function setLineEditMode(isOn) { lineEditMode = isOn; if (lineEditMode) { if (connectMode) toggleConnectMode(); editLineButton.textContent = "Stop Editing Lines"; editLineButton.style.backgroundColor = 'var(--accent-color)'; lineEditModeInfo.style.display = 'block'; svgCanvas.style.pointerEvents = 'auto'; if(selectedConnection) selectConnection(selectedConnection); } else { editLineButton.textContent = "Edit Lines"; editLineButton.style.backgroundColor = ''; lineEditModeInfo.style.display = 'none'; svgCanvas.style.pointerEvents = 'none'; deselectConnection(); } }
         function arePortsCompatible(p1Def, p2Def) { return p1Def.type === p2Def.type; }
         const ALLOW_MULTIPLE_CONNECTIONS_TO_PORT = true; 
-        function handlePortClick(blockData, portDef, portElement) { /* ... same ... */ if (!connectMode || (new Date().getTime() - (dragTarget?.lastDragTime || 0) < 100)) return; const portDataObj = blockData.ports.find(p => p.fullId === portElement.id); if (portDataObj && portDataObj.connectedTo && !ALLOW_MULTIPLE_CONNECTIONS_TO_PORT) { alert(`Port ${portDef.label} is already connected.`); return; } if (!firstPortToConnect) { firstPortToConnect = { blockData, portDef, portElement }; portElement.classList.add('selected-for-connection'); } else { if (firstPortToConnect.blockData.id === blockData.id && firstPortToConnect.portElement.id === portElement.id ) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; return;  } if (firstPortToConnect.blockData.id === blockData.id && !ALLOW_MULTIPLE_CONNECTIONS_TO_PORT) { alert("Cannot connect a block to itself (different ports on same block is ok if multiple connections allowed)."); if (firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; return; } if (!arePortsCompatible(firstPortToConnect.portDef, portDef)) { alert(`Ports not compatible: ${firstPortToConnect.portDef.type} vs ${portDef.type}.`); return; } const secondPortData = blockData.ports.find(p => p.fullId === portElement.id); if (secondPortData && secondPortData.connectedTo && !ALLOW_MULTIPLE_CONNECTIONS_TO_PORT) { alert(`Target port ${portDef.label} is already connected.`); return; } createConnection(firstPortToConnect, { blockData, portDef, portElement }); firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } }
-        function getPortAbsoluteConnectionPoint(blockId, portFullId) { /* ... same ... */ const block = blocks.find(b => b.id === blockId); if (!block) return null; const portObj = block.ports.find(p => p.fullId === portFullId); if (!portObj || !portObj.element) return null; const portPosOnBlock = getPortPixelPositionOnBlock(block.definition, portObj.definition); const x = block.x + portPosOnBlock.x; const y = block.y + portPosOnBlock.y; return { x, y, side: portObj.definition.side }; }
-
-        function createConnection(port1Info, port2Info) { /* ... same ... */ const connectionId = `conn-${nextConnectionId++}`; const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pathElement.id = connectionId; let strokeColor = 'var(--text-color)', strokeDashArray = "none", strokeWidth = '3'; pathElement.style.setProperty('--original-stroke-width', strokeWidth + 'px'); switch (port1Info.portDef.type) { case 'hot-water': strokeColor = 'var(--hot-water-color)'; break; case 'cold-water': strokeColor = 'var(--cold-water-color)'; break; case 'data-signal': strokeColor = 'var(--info-signal-color)'; strokeDashArray = "5,5"; break; case 'power': strokeColor = 'var(--power-color)'; strokeWidth = '4'; pathElement.style.setProperty('--original-stroke-width', strokeWidth + 'px'); break; } pathElement.setAttribute('stroke', strokeColor); pathElement.setAttribute('stroke-width', strokeWidth); pathElement.setAttribute('stroke-dasharray', strokeDashArray); pathElement.setAttribute('fill', 'none'); if (port1Info.portDef.type !== 'data-signal') pathElement.setAttribute('marker-end', 'url(#arrowhead)'); const connectionData = { id: connectionId, type: port1Info.portDef.type, fromBlockId: port1Info.blockData.id, fromPortFullId: port1Info.portElement.id, toBlockId: port2Info.blockData.id, toPortFullId: port2Info.portElement.id, element: pathElement, inflectionPoints: [], handles: [] }; svgCanvas.appendChild(pathElement); connections.push(connectionData); pathElement.addEventListener('click', (e) => { if (lineEditMode) { e.stopPropagation(); selectConnection(connectionData); } }); port1Info.blockData.connections.push(connectionId); port2Info.blockData.connections.push(connectionId); if (!ALLOW_MULTIPLE_CONNECTIONS_TO_PORT) { const p1 = port1Info.blockData.ports.find(p=>p.fullId === port1Info.portElement.id); const p2 = port2Info.blockData.ports.find(p=>p.fullId === port2Info.portElement.id); if(p1) p1.connectedTo = { blockId: port2Info.blockData.id, portId: port2Info.portDef.id }; if(p2) p2.connectedTo = { blockId: port1Info.blockData.id, portId: port1Info.portDef.id }; } calculateAndDrawPath(connectionData, true); }
-        
-        function calculateInflectionPoints(s, e) { // IPs are {x,y} relative to workspace
-            let ip1 = {}, ip2 = {};
-            if (s.side === 'left' || s.side === 'right') { // s exits horizontally
-                ip1.x = snapToGrid((s.x + e.x) / 2); 
-                ip1.y = s.y;
-                ip2.x = ip1.x;
-                ip2.y = e.y;
-            } else { // s exits vertically
-                ip1.x = s.x;
-                ip1.y = snapToGrid((s.y + e.y) / 2);
-                ip2.x = e.x;
-                ip2.y = ip1.y;
-            }
-            return [ip1, ip2];
-        }
-
-        function pointsToPathString(s, e, inflectionPoints) {
-            const [ip1, ip2] = inflectionPoints;
-            let d = `M ${s.x} ${s.y}`;
-            if (s.side === 'left' || s.side === 'right') { // Initial segment is H
-                d += ` L ${ip1.x} ${s.y}`;   // Seg 1 (H to ip1.x, s.y)
-                d += ` L ${ip1.x} ${ip2.y}`; // Seg 2 (V to ip1.x, ip2.y)
-                d += ` L ${e.x} ${ip2.y}`;   // Seg 3 (H to e.x, ip2.y)
-            } else { // Initial segment is V
-                d += ` L ${s.x} ${ip1.y}`;   // Seg 1 (V to s.x, ip1.y)
-                d += ` L ${ip2.x} ${ip1.y}`; // Seg 2 (H to ip2.x, ip1.y)
-                d += ` L ${ip2.x} ${e.y}`;   // Seg 3 (V to ip2.x, e.y)
-            }
-            d += ` L ${e.x} ${e.y}`; // Final line to end port
-            return d;
-        }
-        
-        function calculateAndDrawPath(connectionData, initializeIPs = false) { /* ... same ... */ const s = getPortAbsoluteConnectionPoint(connectionData.fromBlockId, connectionData.fromPortFullId); const e = getPortAbsoluteConnectionPoint(connectionData.toBlockId, connectionData.toPortFullId); if (!s || !e) return; if (initializeIPs || !connectionData.inflectionPoints || connectionData.inflectionPoints.length !== 2) { connectionData.inflectionPoints = calculateInflectionPoints(s, e); } const pathString = pointsToPathString(s, e, connectionData.inflectionPoints); connectionData.element.setAttribute('d', pathString); if (selectedConnection && selectedConnection.id === connectionData.id) { updateLineHandles(connectionData); } }
+        function handlePortClick(blockData, portDef, portElement) { if (!connectMode || (new Date().getTime() - (dragTarget?.lastDragTime || 0) < 100)) return; const portDataObj = blockData.ports.find(p => p.fullId === portElement.id); if (portDataObj && portDataObj.connectedToCount && !ALLOW_MULTIPLE_CONNECTIONS_TO_PORT) { alert(`Port ${portDef.label} is already connected (single connection mode).`); return; } if (!firstPortToConnect) { firstPortToConnect = { blockData, portDef, portElement }; portElement.classList.add('selected-for-connection'); } else { if (firstPortToConnect.blockData.id === blockData.id && firstPortToConnect.portElement.id === portElement.id ) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; return;  } if (firstPortToConnect.blockData.id === blockData.id && !ALLOW_MULTIPLE_CONNECTIONS_TO_PORT) { alert("Cannot connect a block to itself (unless multiple connections to port allowed)."); if (firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; return; } if (!arePortsCompatible(firstPortToConnect.portDef, portDef)) { alert(`Ports not compatible: ${firstPortToConnect.portDef.type} vs ${portDef.type}.`); return; } const secondPortData = blockData.ports.find(p => p.fullId === portElement.id); if (secondPortData && secondPortData.connectedToCount && !ALLOW_MULTIPLE_CONNECTIONS_TO_PORT) { alert(`Target port ${portDef.label} is already connected (single connection mode).`); return; } createConnection(firstPortToConnect, { blockData, portDef, portElement }); firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } }
+        function getPortAbsoluteConnectionPoint(blockId, portFullId) { const block = blocks.find(b => b.id === blockId); if (!block) return null; const portObj = block.ports.find(p => p.fullId === portFullId); if (!portObj || !portObj.element) return null; const portPosOnBlock = getPortPixelPositionOnBlock(block.definition, portObj.definition); const x = block.x + portPosOnBlock.x; const y = block.y + portPosOnBlock.y; return { x, y, side: portObj.definition.side }; }
+        function createConnection(port1Info, port2Info, loadedConnectionData = null) { const connectionId = loadedConnectionData ? loadedConnectionData.id : `conn-${nextConnectionId++}`; const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pathElement.id = connectionId; let strokeColor = 'var(--text-color)', strokeDashArray = "none", strokeWidth = '3'; pathElement.style.setProperty('--original-stroke-width', strokeWidth + 'px'); switch (port1Info.portDef.type) { case 'hot-water': strokeColor = 'var(--hot-water-color)'; break; case 'cold-water': strokeColor = 'var(--cold-water-color)'; break; case 'data-signal': strokeColor = 'var(--info-signal-color)'; strokeDashArray = "5,5"; break; case 'power': strokeColor = 'var(--power-color)'; strokeWidth = '4'; pathElement.style.setProperty('--original-stroke-width', strokeWidth + 'px'); break; } pathElement.setAttribute('stroke', strokeColor); pathElement.setAttribute('stroke-width', strokeWidth); pathElement.setAttribute('stroke-dasharray', strokeDashArray); pathElement.setAttribute('fill', 'none'); if (port1Info.portDef.type !== 'data-signal') pathElement.setAttribute('marker-end', 'url(#arrowhead)'); const connectionData = { id: connectionId, type: port1Info.portDef.type, fromBlockId: port1Info.blockData.id, fromPortFullId: port1Info.portElement.id, toBlockId: port2Info.blockData.id, toPortFullId: port2Info.portElement.id, element: pathElement, inflectionPoints: loadedConnectionData ? loadedConnectionData.inflectionPoints : [], handles: [] }; svgCanvas.appendChild(pathElement); connections.push(connectionData); pathElement.addEventListener('click', (e) => { if (lineEditMode) { e.stopPropagation(); selectConnection(connectionData); } }); port1Info.blockData.connections.push(connectionId); port2Info.blockData.connections.push(connectionId); const p1 = port1Info.blockData.ports.find(p => p.fullId === port1Info.portElement.id); if (p1) p1.connectedToCount = (p1.connectedToCount || 0) + 1; const p2 = port2Info.blockData.ports.find(p => p.fullId === port2Info.portElement.id); if (p2) p2.connectedToCount = (p2.connectedToCount || 0) + 1; calculateAndDrawPath(connectionData, !loadedConnectionData); return connectionData; }
+        function calculateInflectionPoints(s, e) { let ip1 = {}, ip2 = {}; if (s.side === 'left' || s.side === 'right') { ip1.x = snapToGrid((s.x + e.x) / 2); ip1.y = s.y; ip2.x = ip1.x; ip2.y = e.y; } else { ip1.x = s.x; ip1.y = snapToGrid((s.y + e.y) / 2); ip2.x = e.x; ip2.y = ip1.y; } return [ip1, ip2]; }
+        function pointsToPathString(s, e, inflectionPoints) { const [ip1, ip2] = inflectionPoints; let d = `M ${s.x} ${s.y}`; if (s.side === 'left' || s.side === 'right') { d += ` L ${ip1.x} ${s.y}`; d += ` L ${ip1.x} ${ip2.y}`; d += ` L ${e.x} ${ip2.y}`; } else { d += ` L ${s.x} ${ip1.y}`; d += ` L ${ip2.x} ${ip1.y}`; d += ` L ${ip2.x} ${e.y}`; } d += ` L ${e.x} ${e.y}`; return d; }
+        function calculateAndDrawPath(connectionData, initializeIPs = false) { const s = getPortAbsoluteConnectionPoint(connectionData.fromBlockId, connectionData.fromPortFullId); const e = getPortAbsoluteConnectionPoint(connectionData.toBlockId, connectionData.toPortFullId); if (!s || !e) return; if (initializeIPs || !connectionData.inflectionPoints || connectionData.inflectionPoints.length !== 2) { connectionData.inflectionPoints = calculateInflectionPoints(s, e); } const pathString = pointsToPathString(s, e, connectionData.inflectionPoints); connectionData.element.setAttribute('d', pathString); if (selectedConnection && selectedConnection.id === connectionData.id) { updateLineHandles(connectionData); } }
         function updateConnectionsForBlock(blockId) { connections.forEach(conn => { if (conn.fromBlockId === blockId || conn.toBlockId === blockId) calculateAndDrawPath(conn, true); }); }
-
         function selectConnection(connectionData) { deselectConnection(); selectedConnection = connectionData; selectedConnection.element.style.stroke = 'var(--accent-color)'; selectedConnection.element.style.strokeWidth = `calc(${getComputedStyle(selectedConnection.element).getPropertyValue('--original-stroke-width')} + 3px)`; createLineHandles(selectedConnection); }
         function deselectConnection() { if (selectedConnection) { selectedConnection.element.style.stroke = ''; selectedConnection.element.style.strokeWidth = ''; removeLineHandles(selectedConnection); } selectedConnection = null; }
-        
         function createLineHandles(connection) { removeLineHandles(connection); const [ip1, ip2] = connection.inflectionPoints; const handle1 = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); handle1.setAttribute('cx', ip1.x); handle1.setAttribute('cy', ip1.y); handle1.setAttribute('class', 'line-handle'); handle1.addEventListener('mousedown', (e) => { e.stopPropagation(); draggingHandle = { connection, handleIndex: 0 }; }); svgCanvas.appendChild(handle1); connection.handles.push(handle1); const handle2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); handle2.setAttribute('cx', ip2.x); handle2.setAttribute('cy', ip2.y); handle2.setAttribute('class', 'line-handle'); handle2.addEventListener('mousedown', (e) => { e.stopPropagation(); draggingHandle = { connection, handleIndex: 1 }; }); svgCanvas.appendChild(handle2); connection.handles.push(handle2); }
         function removeLineHandles(connection) { connection.handles.forEach(h => { if (h.parentNode) h.parentNode.removeChild(h); }); connection.handles = []; }
         function updateLineHandles(connection) { if (selectedConnection && selectedConnection.id === connection.id && lineEditMode) { createLineHandles(connection); } }
+        function deleteBlock(blockId) { const blockIndex = blocks.findIndex(b => b.id === blockId); if (blockIndex === -1) return; const blockData = blocks[blockIndex]; if (selectedConnection && (selectedConnection.fromBlockId === blockId || selectedConnection.toBlockId === blockId)) { deselectConnection(); } connections = connections.filter(conn => { if (conn.fromBlockId === blockId || conn.toBlockId === blockId) { if (conn.element && conn.element.parentNode === svgCanvas) svgCanvas.removeChild(conn.element); removeLineHandles(conn); const otherBlockId = conn.fromBlockId === blockId ? conn.toBlockId : conn.fromBlockId; const otherPortFullId = conn.fromBlockId === blockId ? conn.toPortFullId : conn.fromPortFullId; const otherBlock = blocks.find(b => b.id === otherBlockId); if (otherBlock) { const otherPort = otherBlock.ports.find(p => p.fullId === otherPortFullId); if (otherPort) otherPort.connectedToCount = (otherPort.connectedToCount || 1) - 1; otherBlock.connections = otherBlock.connections.filter(cId => cId !== conn.id); } return false; } return true; }); if (blockData.element && blockData.element.parentNode === workspace) workspace.removeChild(blockData.element); blocks.splice(blockIndex, 1); }
+        function clearWorkspace(confirmClear = true) { if (confirmClear && !confirm("Clear workspace?")) return; deselectConnection(); blocks.forEach(block => { if (block.element && block.element.parentNode === workspace) workspace.removeChild(block.element); }); blocks = []; nextBlockId = 0; connections.forEach(conn => { if (conn.element && conn.element.parentNode === svgCanvas) svgCanvas.removeChild(conn.element); removeLineHandles(conn); }); connections = []; nextConnectionId = 0; if (connectMode) toggleConnectMode(); if (lineEditMode) setLineEditMode(false); if (firstPortToConnect) { if(firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } userDefinedBlockDefinitions = {}; updateCustomBlockButtons(); /* Clear custom defs too */ }
+        function setupSvgDefs() { const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs'); const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker'); marker.setAttribute('id', 'arrowhead'); marker.setAttribute('markerWidth', '10'); marker.setAttribute('markerHeight', '7'); marker.setAttribute('refX', '8'); marker.setAttribute('refY', '3.5'); marker.setAttribute('orient', 'auto'); const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon'); polygon.setAttribute('points', '0 0, 10 3.5, 0 7'); polygon.setAttribute('fill', 'currentColor'); marker.appendChild(polygon); defs.appendChild(marker); svgCanvas.appendChild(defs); }
         
-        function deleteBlock(blockId) { /* ... same ... */ const blockIndex = blocks.findIndex(b => b.id === blockId); if (blockIndex === -1) return; const blockData = blocks[blockIndex]; if (selectedConnection && (selectedConnection.fromBlockId === blockId || selectedConnection.toBlockId === blockId)) { deselectConnection(); } connections = connections.filter(conn => { if (conn.fromBlockId === blockId || conn.toBlockId === blockId) { if (conn.element && conn.element.parentNode === svgCanvas) svgCanvas.removeChild(conn.element); removeLineHandles(conn); const otherBlockId = conn.fromBlockId === blockId ? conn.toBlockId : conn.fromBlockId; const otherPortFullId = conn.fromBlockId === blockId ? conn.toPortFullId : conn.fromPortFullId; const otherBlock = blocks.find(b => b.id === otherBlockId); if (otherBlock) { const otherPort = otherBlock.ports.find(p => p.fullId === otherPortFullId); if (otherPort && !ALLOW_MULTIPLE_CONNECTIONS_TO_PORT) otherPort.connectedTo = null; otherBlock.connections = otherBlock.connections.filter(cId => cId !== conn.id); } return false; } return true; }); if (blockData.element && blockData.element.parentNode === workspace) workspace.removeChild(blockData.element); blocks.splice(blockIndex, 1); }
-        function clearWorkspace() { /* ... same ... */ if (!confirm("Clear workspace?")) return; deselectConnection(); blocks.forEach(block => { if (block.element && block.element.parentNode === workspace) workspace.removeChild(block.element); }); blocks = []; nextBlockId = 0; connections.forEach(conn => { if (conn.element && conn.element.parentNode === svgCanvas) svgCanvas.removeChild(conn.element); removeLineHandles(conn); }); connections = []; nextConnectionId = 0; if (connectMode) toggleConnectMode(); if (lineEditMode) setLineEditMode(false); if (firstPortToConnect) { if(firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } }
-        function setupSvgDefs() { /* ... same ... */ const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs'); const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker'); marker.setAttribute('id', 'arrowhead'); marker.setAttribute('markerWidth', '10'); marker.setAttribute('markerHeight', '7'); marker.setAttribute('refX', '8'); marker.setAttribute('refY', '3.5'); marker.setAttribute('orient', 'auto'); const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon'); polygon.setAttribute('points', '0 0, 10 3.5, 0 7'); polygon.setAttribute('fill', 'currentColor'); marker.appendChild(polygon); defs.appendChild(marker); svgCanvas.appendChild(defs); }
-        
+        // --- Save/Load Functionality ---
+        function saveLayout() {
+            const layoutData = {
+                blocks: blocks.map(b => ({ // Only save serializable data
+                    id: b.id, // Save original ID for re-mapping during complex loads (though not fully used yet)
+                    type: b.type,
+                    x: b.x,
+                    y: b.y,
+                    userLabel: b.userLabel || ""
+                })),
+                connections: connections.map(c => ({
+                    id: c.id,
+                    type: c.type,
+                    fromBlockId: c.fromBlockId,
+                    fromPortRelativeId: c.fromPortFullId.split('_').slice(1).join('_'), // e.g. block-0_hw_out -> hw_out
+                    toBlockId: c.toBlockId,
+                    toPortRelativeId: c.toPortFullId.split('_').slice(1).join('_'),
+                    inflectionPoints: c.inflectionPoints
+                })),
+                userDefinedBlockDefinitions: userDefinedBlockDefinitions,
+                nextBlockId: nextBlockId,
+                nextConnectionId: nextConnectionId
+            };
+            const jsonString = JSON.stringify(layoutData, null, 2); // Pretty print
+            const blob = new Blob([jsonString], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "heating_system_layout.json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            alert("Layout saved!");
+        }
+
+        function loadLayout(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const layoutData = JSON.parse(e.target.result);
+                    clearWorkspace(false); // Clear without confirmation
+
+                    userDefinedBlockDefinitions = layoutData.userDefinedBlockDefinitions || {};
+                    updateCustomBlockButtons();
+                    
+                    nextBlockId = layoutData.nextBlockId || 0; // Restore counters
+                    nextConnectionId = layoutData.nextConnectionId || 0;
+
+                    const idMap = {}; // To map old saved block IDs to newly created block IDs
+
+                    // Recreate Blocks
+                    (layoutData.blocks || []).forEach(savedBlock => {
+                        const newBlockData = addBlock(savedBlock.type, {
+                            id: savedBlock.id, // Pass the original ID
+                            x: savedBlock.x,
+                            y: savedBlock.y,
+                            userLabel: savedBlock.userLabel
+                        });
+                        if (newBlockData) {
+                           idMap[savedBlock.id] = newBlockData.id; // Map old ID to new ID
+                           // Position is already set by addBlock when loadedBlockData is passed
+                           newBlockData.element.style.left = `${savedBlock.x}px`;
+                           newBlockData.element.style.top = `${savedBlock.y}px`;
+                           // Re-apply draggable if it was removed or not added initially
+                           makeDraggable(newBlockData.element, newBlockData);
+                        }
+                    });
+                    
+                    // Recreate Connections
+                    (layoutData.connections || []).forEach(savedConn => {
+                        const newFromBlockId = idMap[savedConn.fromBlockId];
+                        const newToBlockId = idMap[savedConn.toBlockId];
+
+                        const fromBlockData = blocks.find(b => b.id === newFromBlockId);
+                        const toBlockData = blocks.find(b => b.id === newToBlockId);
+
+                        if (fromBlockData && toBlockData) {
+                            const fromPort = fromBlockData.ports.find(p => p.id === savedConn.fromPortRelativeId);
+                            const toPort = toBlockData.ports.find(p => p.id === savedConn.toPortRelativeId);
+
+                            if (fromPort && toPort) {
+                                createConnection(
+                                    { blockData: fromBlockData, portDef: fromPort.definition, portElement: fromPort.element },
+                                    { blockData: toBlockData, portDef: toPort.definition, portElement: toPort.element },
+                                    { id: savedConn.id, inflectionPoints: savedConn.inflectionPoints } // Pass loaded IP
+                                );
+                            } else {
+                                console.warn("Could not find ports for connection:", savedConn);
+                            }
+                        } else {
+                            console.warn("Could not find blocks for connection:", savedConn);
+                        }
+                    });
+                    alert("Layout loaded successfully!");
+
+                } catch (err) {
+                    console.error("Error loading layout:", err);
+                    alert("Failed to load layout. File might be corrupted or invalid.");
+                }
+                 // Reset file input to allow loading same file again if needed
+                event.target.value = null;
+            };
+            reader.readAsText(file);
+        }
+
+
         setupSvgDefs(); updateCustomBlockButtons();
         window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (blockEditorModal.style.display === "flex") closeBlockEditor(); else if (lineEditMode && selectedConnection) deselectConnection(); else if (connectMode && firstPortToConnect) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; } } });
         window.onclick = (e) => { if (e.target == blockEditorModal) closeBlockEditor(); else if (lineEditMode && e.target === svgCanvas) { deselectConnection(); } };
