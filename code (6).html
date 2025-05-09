@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heating System Visualizer</title>
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --primary-color: #4a90e2;
+            --secondary-color: #50e3c2;
+            --accent-color: #f5a623;
+            --text-color: #333;
+            --border-color: #d0d0d0;
+            --block-bg: #ffffff;
+            --shadow-color: rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            font-size: 1.5em;
+            box-shadow: 0 2px 4px var(--shadow-color);
+        }
+
+        .main-container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden; /* Important for layout */
+        }
+
+        #controls {
+            width: 250px;
+            padding: 20px;
+            background-color: #fff;
+            border-right: 1px solid var(--border-color);
+            box-shadow: 2px 0 5px var(--shadow-color);
+            overflow-y: auto;
+        }
+
+        #controls h2 {
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--secondary-color);
+            padding-bottom: 10px;
+        }
+
+        #controls button {
+            display: block;
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+
+        #controls button:hover {
+            background-color: #45c9b0;
+        }
+        #controls button:active {
+            transform: scale(0.98);
+        }
+
+        #controls .connect-mode-info {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #eef;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        #workspace-container {
+            flex-grow: 1;
+            position: relative; /* For absolute positioning of SVG and blocks */
+            background-color: var(--bg-color);
+            overflow: auto; /* Allow scrolling if content overflows */
+            padding: 10px; /* Give some space around the workspace */
+        }
+
+        #workspace {
+            position: relative; /* Crucial for block positioning and SVG */
+            width: 2000px; /* Large scrollable area */
+            height: 1500px;
+            background-image:
+                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            border: 1px solid var(--border-color);
+        }
+
+
+        #connection-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allows clicks to go through to blocks */
+        }
+
+        .block {
+            position: absolute;
+            min-width: 120px;
+            min-height: 60px;
+            background-color: var(--block-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 3px 3px 8px var(--shadow-color);
+            cursor: grab;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            user-select: none;
+            text-align: center;
+            font-size: 0.9em;
+            box-sizing: border-box; /* Include padding and border in element's total width and height */
+        }
+        .block:active {
+            cursor: grabbing;
+            z-index: 1000; /* Bring to front when dragging */
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .block.selected-for-connection {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+
+        .heat-pump {
+            border-color: #e74c3c; /* Reddish */
+        }
+        .heat-pump::before { content: "♨️ Heat Pump"; display: block; font-weight: bold; margin-bottom: 5px;}
+
+        .buffer {
+            border-color: #3498db; /* Blueish */
+        }
+        .buffer::before { content: "🔋 Buffer"; display: block; font-weight: bold; margin-bottom: 5px;}
+
+        .input-source {
+            border-color: #2ecc71; /* Greenish */
+        }
+        .input-source::before { content: "⚡ Input"; display: block; font-weight: bold; margin-bottom: 5px;}
+
+        .text-block {
+            background-color: #f9f9f9;
+            border-style: dashed;
+            min-height: 40px;
+            min-width: 100px;
+            padding: 15px;
+            font-style: italic;
+        }
+        .text-block::before { content: "📝 Text"; display: block; font-weight: bold; margin-bottom: 5px; font-style: normal;}
+
+
+        .block-label {
+            font-size: 0.8em;
+            color: #555;
+            margin-top: 5px;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: red;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+            display: none; /* Hidden by default */
+        }
+        .block:hover .delete-btn {
+            display: block;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        Heating System Visualizer
+    </div>
+
+    <div class="main-container">
+        <div id="controls">
+            <h2>Components</h2>
+            <button onclick="addBlock('heat-pump')">Add Heat Pump</button>
+            <button onclick="addBlock('buffer')">Add Buffer Tank</button>
+            <button onclick="addBlock('input-source')">Add Input Source</button>
+            <button onclick="addBlock('text-block')">Add Text Label</button>
+
+            <h2>Connections</h2>
+            <button id="connectButton" onclick="toggleConnectMode()">Start Connecting</button>
+            <div id="connectModeInfo" class="connect-mode-info" style="display:none;">
+                Click two blocks to connect them.
+            </div>
+
+            <h2>Actions</h2>
+            <button onclick="clearWorkspace()">Clear Workspace</button>
+        </div>
+
+        <div id="workspace-container">
+            <div id="workspace">
+                <svg id="connection-svg"></svg>
+                <!-- Blocks will be added here by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const workspace = document.getElementById('workspace');
+        const svgCanvas = document.getElementById('connection-svg');
+        const connectButton = document.getElementById('connectButton');
+        const connectModeInfo = document.getElementById('connectModeInfo');
+
+        let blocks = [];
+        let connections = [];
+        let nextBlockId = 0;
+        let nextConnectionId = 0;
+        let isDragging = false;
+        let dragTarget = null;
+        let offsetX, offsetY;
+
+        let connectMode = false;
+        let firstBlockToConnect = null;
+
+        function getWorkspaceOffset() {
+            const rect = workspace.getBoundingClientRect();
+            const containerRect = workspaceContainer.getBoundingClientRect();
+            return {
+                x: workspace.scrollLeft - containerRect.left, // accounts for scrolling within container
+                y: workspace.scrollTop - containerRect.top    // and container's own offset
+            };
+        }
+
+        function addBlock(type) {
+            const id = `block-${nextBlockId++}`;
+            let contentText = type.replace('-', ' ');
+            contentText = contentText.charAt(0).toUpperCase() + contentText.slice(1);
+
+            if (type === 'text-block') {
+                const userText = prompt("Enter text for the label:", "My Custom Text");
+                if (userText === null) return; // User cancelled
+                contentText = userText;
+            } else {
+                 const userLabel = prompt(`Optional label for ${contentText}:`, "");
+                 if (userLabel !== null && userLabel.trim() !== "") {
+                    contentText += `\n(${userLabel})`;
+                 }
+            }
+
+
+            const blockDiv = document.createElement('div');
+            blockDiv.id = id;
+            blockDiv.className = `block ${type}`;
+            
+            // Simple text display, could be more complex
+            const textNode = document.createElement('span');
+            textNode.style.whiteSpace = 'pre-wrap'; // To respect newlines
+            textNode.textContent = contentText;
+            blockDiv.appendChild(textNode);
+
+            // Initial position (can be improved to avoid overlap)
+            const initialX = 50 + (nextBlockId % 5) * 150;
+            const initialY = 50 + Math.floor(nextBlockId / 5) * 100;
+            blockDiv.style.left = `${initialX}px`;
+            blockDiv.style.top = `${initialY}px`;
+
+            // Delete button
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation(); // Prevent block click/drag
+                deleteBlock(id);
+            };
+            blockDiv.appendChild(deleteBtn);
+
+            workspace.appendChild(blockDiv);
+
+            const blockData = {
+                id: id,
+                element: blockDiv,
+                type: type,
+                x: initialX,
+                y: initialY,
+                connections: [] // Store IDs of connections attached to this block
+            };
+            blocks.push(blockData);
+
+            makeDraggable(blockDiv, blockData);
+            blockDiv.addEventListener('click', () => handleBlockClick(blockData));
+        }
+
+        function makeDraggable(element, blockData) {
+            element.addEventListener('mousedown', (e) => {
+                // Only drag with left mouse button, and not if clicking on delete button
+                if (e.button !== 0 || e.target.classList.contains('delete-btn')) return;
+                
+                isDragging = true;
+                dragTarget = element;
+                
+                // Calculate offset from mouse pointer to block's top-left
+                // This considers the workspace's own scroll position
+                const workspaceRect = workspace.getBoundingClientRect();
+                offsetX = e.clientX - element.getBoundingClientRect().left;
+                offsetY = e.clientY - element.getBoundingClientRect().top;
+                
+                element.style.cursor = 'grabbing';
+                element.style.zIndex = 1000; // Bring to front
+            });
+        }
+
+        // Global mousemove and mouseup listeners for dragging
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || !dragTarget) return;
+            e.preventDefault(); // Prevent text selection during drag
+
+            const workspaceRect = workspace.getBoundingClientRect();
+            
+            // New position relative to the workspace div
+            let newX = e.clientX - workspaceRect.left - offsetX + workspace.scrollLeft;
+            let newY = e.clientY - workspaceRect.top - offsetY + workspace.scrollTop;
+
+            // Constrain to workspace boundaries (optional, can be removed for infinite feel)
+            newX = Math.max(0, Math.min(newX, workspace.offsetWidth - dragTarget.offsetWidth));
+            newY = Math.max(0, Math.min(newY, workspace.offsetHeight - dragTarget.offsetHeight));
+
+            dragTarget.style.left = `${newX}px`;
+            dragTarget.style.top = `${newY}px`;
+
+            const blockData = blocks.find(b => b.id === dragTarget.id);
+            if (blockData) {
+                blockData.x = newX;
+                blockData.y = newY;
+                updateConnectionsForBlock(blockData.id);
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (isDragging && dragTarget) {
+                dragTarget.style.cursor = 'grab';
+                dragTarget.style.zIndex = ''; // Reset z-index
+                isDragging = false;
+                dragTarget = null;
+            }
+        });
+        
+        function toggleConnectMode() {
+            connectMode = !connectMode;
+            if (connectMode) {
+                connectButton.textContent = 'Cancel Connecting';
+                connectButton.style.backgroundColor = var(--accent-color);
+                connectModeInfo.style.display = 'block';
+                workspace.style.cursor = 'crosshair';
+                if (firstBlockToConnect) {
+                    firstBlockToConnect.element.classList.remove('selected-for-connection');
+                    firstBlockToConnect = null;
+                }
+            } else {
+                connectButton.textContent = 'Start Connecting';
+                connectButton.style.backgroundColor = ''; // Revert to default
+                connectModeInfo.style.display = 'none';
+                workspace.style.cursor = 'default';
+                if (firstBlockToConnect) {
+                    firstBlockToConnect.element.classList.remove('selected-for-connection');
+                }
+                firstBlockToConnect = null;
+            }
+        }
+
+        function handleBlockClick(blockData) {
+            if (!connectMode) return;
+
+            if (!firstBlockToConnect) {
+                firstBlockToConnect = blockData;
+                blockData.element.classList.add('selected-for-connection');
+            } else {
+                if (firstBlockToConnect.id === blockData.id) {
+                    // Clicked the same block again, deselect
+                    blockData.element.classList.remove('selected-for-connection');
+                    firstBlockToConnect = null;
+                    return;
+                }
+                // Second block selected, create connection
+                createConnection(firstBlockToConnect, blockData);
+                firstBlockToConnect.element.classList.remove('selected-for-connection');
+                // Optionally, keep connect mode active for more connections or turn it off
+                // toggleConnectMode(); // Turn off after one connection
+                firstBlockToConnect = null; // Reset for next connection
+            }
+        }
+
+        function createConnection(block1Data, block2Data) {
+            // Check if connection already exists
+            const existingConnection = connections.find(conn =>
+                (conn.from === block1Data.id && conn.to === block2Data.id) ||
+                (conn.from === block2Data.id && conn.to === block1Data.id)
+            );
+            if (existingConnection) {
+                alert("These blocks are already connected.");
+                return;
+            }
+
+            const connectionId = `conn-${nextConnectionId++}`;
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.id = connectionId;
+            line.setAttribute('stroke', 'var(--text-color)');
+            line.setAttribute('stroke-width', '3');
+            line.setAttribute('marker-end', 'url(#arrowhead)'); // Optional arrowhead
+
+            svgCanvas.appendChild(line);
+            
+            const connectionData = {
+                id: connectionId,
+                from: block1Data.id,
+                to: block2Data.id,
+                element: line
+            };
+            connections.push(connectionData);
+
+            // Store connection reference in blocks
+            block1Data.connections.push(connectionId);
+            block2Data.connections.push(connectionId);
+            
+            updateConnectionLine(connectionData);
+            console.log(`Connected ${block1Data.id} to ${block2Data.id}`);
+        }
+
+        function updateConnectionLine(connectionData) {
+            const fromBlock = blocks.find(b => b.id === connectionData.from);
+            const toBlock = blocks.find(b => b.id === connectionData.to);
+
+            if (!fromBlock || !toBlock) return; // One block might have been deleted
+
+            const line = connectionData.element;
+
+            // Calculate center points of the blocks
+            const x1 = fromBlock.x + fromBlock.element.offsetWidth / 2;
+            const y1 = fromBlock.y + fromBlock.element.offsetHeight / 2;
+            const x2 = toBlock.x + toBlock.element.offsetWidth / 2;
+            const y2 = toBlock.y + toBlock.element.offsetHeight / 2;
+
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+        }
+
+        function updateConnectionsForBlock(blockId) {
+            connections.forEach(conn => {
+                if (conn.from === blockId || conn.to === blockId) {
+                    updateConnectionLine(conn);
+                }
+            });
+        }
+
+        function deleteBlock(blockId) {
+            const blockIndex = blocks.findIndex(b => b.id === blockId);
+            if (blockIndex === -1) return;
+
+            const blockData = blocks[blockIndex];
+            
+            // Remove associated connections
+            const connectionsToRemove = [];
+            connections = connections.filter(conn => {
+                if (conn.from === blockId || conn.to === blockId) {
+                    connectionsToRemove.push(conn);
+                    svgCanvas.removeChild(conn.element); // Remove line from SVG
+                    return false; // Remove from connections array
+                }
+                return true;
+            });
+
+            // Clean up connection references in other blocks
+            connectionsToRemove.forEach(removedConn => {
+                blocks.forEach(b => {
+                    b.connections = b.connections.filter(cId => cId !== removedConn.id);
+                });
+            });
+
+            // Remove block element from DOM
+            workspace.removeChild(blockData.element);
+            // Remove block from array
+            blocks.splice(blockIndex, 1);
+
+            console.log(`Deleted block ${blockId} and its connections.`);
+        }
+
+
+        function clearWorkspace() {
+            if (!confirm("Are you sure you want to clear everything?")) return;
+
+            // Remove all block elements
+            blocks.forEach(block => workspace.removeChild(block.element));
+            blocks = [];
+            nextBlockId = 0;
+
+            // Remove all connection elements
+            connections.forEach(conn => svgCanvas.removeChild(conn.element));
+            connections = [];
+            nextConnectionId = 0;
+
+            if (connectMode) {
+                toggleConnectMode(); // Reset connect mode
+            }
+            console.log("Workspace cleared.");
+        }
+
+        // Optional: Add an arrowhead definition to SVG (add this once)
+        function setupSvgDefs() {
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            marker.setAttribute('id', 'arrowhead');
+            marker.setAttribute('markerWidth', '10');
+            marker.setAttribute('markerHeight', '7');
+            marker.setAttribute('refX', '0');
+            marker.setAttribute('refY', '3.5');
+            marker.setAttribute('orient', 'auto');
+            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
+            polygon.setAttribute('fill', 'var(--text-color)');
+            marker.appendChild(polygon);
+            defs.appendChild(marker);
+            svgCanvas.appendChild(defs);
+        }
+
+        // Initialize
+        setupSvgDefs(); // Call this to add arrowhead definition
+        const workspaceContainer = document.getElementById('workspace-container');
+
+    </script>
+</body>
+</html>
