@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Heating System Visualizer</title>
+    <title>Dynamic Heating & Power System Visualizer</title>
     <style>
         :root {
             --bg-color: #f0f4f8;
@@ -18,6 +18,7 @@
             --hot-water-color: #e74c3c;
             --cold-water-color: #3498db;
             --info-signal-color: #2ecc71;
+            --power-color: #9b59b6; /* Purple for Power */
         }
 
         body {
@@ -38,17 +39,13 @@
             text-align: center;
             font-size: 1.5em;
             box-shadow: 0 2px 4px var(--shadow-color);
-            z-index: 100; /* Above controls/workspace */
+            z-index: 100;
         }
 
-        .main-container {
-            display: flex;
-            flex-grow: 1;
-            overflow: hidden;
-        }
+        .main-container { display: flex; flex-grow: 1; overflow: hidden; }
 
         #controls {
-            width: 280px; /* Slightly wider for new blocks */
+            width: 300px; /* Wider for more buttons */
             padding: 20px;
             background-color: #fff;
             border-right: 1px solid var(--border-color);
@@ -57,203 +54,156 @@
             flex-shrink: 0;
         }
 
-        #controls h2 {
-            margin-top: 0;
+        #controls h2, #controls h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
             color: var(--primary-color);
             border-bottom: 2px solid var(--secondary-color);
-            padding-bottom: 10px;
+            padding-bottom: 8px;
         }
+        #controls h2:first-child { margin-top: 0; }
+
 
         #controls button {
             display: block;
             width: 100%;
-            padding: 12px 15px;
-            margin-bottom: 10px;
+            padding: 10px 15px; /* Slightly smaller padding for more buttons */
+            margin-bottom: 8px;
             background-color: var(--secondary-color);
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 0.95em;
             transition: background-color 0.3s ease, transform 0.1s ease;
         }
-
+        #controls button.special-action { background-color: var(--accent-color); }
         #controls button:hover { background-color: #45c9b0; }
+        #controls button.special-action:hover { background-color: #d8931e; }
         #controls button:active { transform: scale(0.98); }
 
         #controls .connect-mode-info {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #eef;
-            border-radius: 4px;
-            font-size: 0.9em;
+            margin-top: 15px; padding: 10px; background-color: #eef;
+            border-radius: 4px; font-size: 0.9em;
         }
-         #controls .connect-mode-info strong { color: var(--accent-color); }
+        #controls .connect-mode-info strong { color: var(--accent-color); }
 
-        #workspace-container {
-            flex-grow: 1;
-            position: relative;
-            background-color: var(--bg-color);
-            overflow: auto;
-            padding: 10px;
-        }
-
+        #workspace-container { flex-grow: 1; position: relative; background-color: var(--bg-color); overflow: auto; padding: 10px; }
         #workspace {
-            position: relative;
-            width: 2500px; /* Even larger workspace */
-            height: 2000px;
+            position: relative; width: 3000px; height: 2500px;
             background-image:
                 linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
-            background-size: 20px 20px;
-            border: 1px solid var(--border-color);
+            background-size: 20px 20px; border: 1px solid var(--border-color);
         }
-
-        #connection-svg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
+        #connection-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
         .block {
-            position: absolute;
-            min-width: 150px; /* Increased min-width for ports */
-            min-height: 80px; /* Increased min-height for ports */
-            background-color: var(--block-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 3px 3px 8px var(--shadow-color);
-            cursor: grab;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 15px; /* Increased padding */
-            user-select: none;
-            text-align: center;
-            font-size: 0.9em;
-            box-sizing: border-box;
+            position: absolute; min-width: 160px; min-height: 90px;
+            background-color: var(--block-bg); border: 2px solid var(--border-color);
+            border-radius: 8px; box-shadow: 3px 3px 8px var(--shadow-color);
+            cursor: grab; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 15px 20px; /* More horizontal padding */
+            user-select: none; text-align: center; font-size: 0.9em; box-sizing: border-box;
         }
         .block:active { cursor: grabbing; box-shadow: 5px 5px 15px rgba(0,0,0,0.2); }
 
-        /* Block type specific styling - main title handled by JS/CSS, border for type */
         .heat-pump { border-left: 5px solid var(--hot-water-color); }
         .buffer { border-left: 5px solid var(--primary-color); }
-        .input-source { border-left: 5px solid #f39c12; } /* Orange for generic input */
+        .input-source { border-left: 5px solid #f39c12; }
         .heat-user { border-left: 5px solid var(--cold-water-color); }
         .sensor { border-left: 5px solid var(--info-signal-color); }
-        .text-block {
-            background-color: #f9f9f9;
-            border: 2px dashed var(--border-color);
-            min-height: 40px;
-            min-width: 100px;
-            font-style: italic;
-        }
+        .power-source { border-left: 5px solid var(--power-color); }
+        .text-block { background-color: #f9f9f9; border: 2px dashed var(--border-color); min-height: 40px; min-width: 100px; font-style: italic; }
         
-        .block-title {
-            font-weight: bold;
-            margin-bottom: 8px;
-            font-size: 1em;
-        }
-        .block-label { /* For user-defined label */
-            font-size: 0.85em;
-            color: #555;
-            white-space: pre-wrap;
-            margin-top: 5px;
-        }
+        .block-title { font-weight: bold; margin-bottom: 8px; font-size: 1em; }
+        .block-label { font-size: 0.85em; color: #555; white-space: pre-wrap; margin-top: 5px; }
 
         .delete-btn {
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            background-color: #d9534f;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            font-size: 14px;
-            line-height: 24px;
-            text-align: center;
-            cursor: pointer;
-            display: none;
-            z-index: 1050; /* Above block and ports */
+            position: absolute; top: -10px; right: -10px; background-color: #d9534f;
+            color: white; border: none; border-radius: 50%; width: 24px; height: 24px;
+            font-size: 14px; line-height: 24px; text-align: center; cursor: pointer;
+            display: none; z-index: 1050;
         }
         .block:hover .delete-btn { display: block; }
 
-        /* Port Styling */
         .port {
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            border: 1px solid #555;
-            border-radius: 50%;
-            cursor: pointer;
-            box-sizing: border-box;
-            z-index: 1; 
+            position: absolute; width: 16px; height: 16px; border: 1px solid #555;
+            border-radius: 50%; cursor: pointer; box-sizing: border-box; z-index: 1010; /* Above block content slightly */
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-        .port:hover {
-            transform: scale(1.3);
-            box-shadow: 0 0 5px var(--accent-color);
-        }
-        .port.selected-for-connection {
-            border-width: 3px;
-            border-color: var(--accent-color) !important; /* Important to override other border colors */
-            transform: scale(1.4);
-        }
+        .port:hover { transform: scale(1.3); box-shadow: 0 0 5px var(--accent-color); }
+        .port.selected-for-connection { border-width: 3px; border-color: var(--accent-color) !important; transform: scale(1.4); }
 
-        .port.hot-water { background-color: var(--hot-water-color); border-color: darken(var(--hot-water-color), 20%); }
-        .port.cold-water { background-color: var(--cold-water-color); border-color: darken(var(--cold-water-color), 20%); }
-        .port.data-signal { background-color: var(--info-signal-color); border-color: darken(var(--info-signal-color), 20%); }
+        .port.hot-water { background-color: var(--hot-water-color); }
+        .port.cold-water { background-color: var(--cold-water-color); }
+        .port.data-signal { background-color: var(--info-signal-color); }
+        .port.power { background-color: var(--power-color); }
         
-        .port-label-tip { /* Tooltip for port label */
-            visibility: hidden;
-            width: max-content;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 4px;
-            padding: 5px 8px;
-            position: absolute;
-            z-index: 1060; /* Above everything */
-            bottom: 125%; /* Position above the port */
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.3s;
-            font-size: 0.8em;
+        .port-label-tip {
+            visibility: hidden; width: max-content; background-color: #333; color: #fff;
+            text-align: center; border-radius: 4px; padding: 5px 8px; position: absolute;
+            z-index: 1060; bottom: 125%; left: 50%; transform: translateX(-50%);
+            opacity: 0; transition: opacity 0.3s; font-size: 0.8em;
         }
-        .port:hover .port-label-tip {
-            visibility: visible;
-            opacity: 1;
+        .port:hover .port-label-tip { visibility: visible; opacity: 1; }
+
+        /* Modal Styles */
+        .modal {
+            display: none; position: fixed; z-index: 2000; left: 0; top: 0;
+            width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6);
+            align-items: center; justify-content: center;
         }
+        .modal-content {
+            background-color: #fefefe; margin: auto; padding: 25px;
+            border: 1px solid #888; border-radius: 8px; width: 90%; max-width: 600px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h2 { margin: 0; color: var(--primary-color); }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+        .form-group input[type="text"], .form-group input[type="number"], .form-group select {
+            width: calc(100% - 20px); padding: 10px; border: 1px solid var(--border-color);
+            border-radius: 4px; box-sizing: border-box; font-size: 0.9em;
+        }
+        .port-editor-row {
+            display: flex; gap: 10px; align-items: center;
+            padding: 10px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 10px;
+        }
+        .port-editor-row input, .port-editor-row select { flex-grow: 1; min-width: 80px; }
+        .port-editor-row button { padding: 5px 10px; font-size: 0.8em; background-color: #e74c3c; }
+
+        #customPortsContainer .form-group { flex-basis: 22%; } /* Adjust for smaller inputs in a row */
 
     </style>
 </head>
 <body>
-
-    <div class="header">
-        Advanced Heating System Visualizer
-    </div>
-
+    <div class="header">Dynamic Heating & Power System Visualizer</div>
     <div class="main-container">
         <div id="controls">
-            <h2>Components</h2>
+            <h2>Standard Components</h2>
             <button onclick="addBlock('heat-pump')">Add Heat Pump</button>
             <button onclick="addBlock('buffer')">Add Buffer Tank</button>
             <button onclick="addBlock('input-source')">Add Input (e.g., Solar)</button>
-            <button onclick="addBlock('heat-user')">Add Heat User (e.g., Radiator)</button>
-            <button onclick="addBlock('sensor')">Add Sensor/Measure Point</button>
+            <button onclick="addBlock('heat-user')">Add Heat User</button>
+            <button onclick="addBlock('sensor')">Add Sensor</button>
+            <button onclick="addBlock('power-source')">Add Power Source</button>
             <button onclick="addBlock('text-block')">Add Text Label</button>
+            
+            <h3>Custom Components</h3>
+            <button id="openBlockEditorBtn" class="special-action" onclick="openBlockEditor()">Create Custom Block</button>
+            <div id="customBlockButtonsContainer">
+                <!-- Custom block buttons will be added here -->
+            </div>
 
             <h2>Connections</h2>
             <button id="connectButton" onclick="toggleConnectMode()">Start Connecting</button>
             <div id="connectModeInfo" class="connect-mode-info" style="display:none;">
-                Click a <strong>port</strong> on one block, then a <strong>compatible port</strong> on another.
+                Click a <strong>port</strong>, then a <strong>compatible port</strong>.
             </div>
 
             <h2>Actions</h2>
@@ -261,10 +211,34 @@
         </div>
 
         <div id="workspace-container">
-            <div id="workspace">
-                <svg id="connection-svg"></svg>
-                <!-- Blocks will be added here by JavaScript -->
+            <div id="workspace"><svg id="connection-svg"></svg></div>
+        </div>
+    </div>
+
+    <!-- Block Editor Modal -->
+    <div id="blockEditorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create Custom Block</h2>
+                <span class="close-button" onclick="closeBlockEditor()">&times;</span>
             </div>
+            <div class="form-group">
+                <label for="customBlockTitleInput">Block Title (e.g., "My Smart Valve"):</label>
+                <input type="text" id="customBlockTitleInput" placeholder="Visible title of the block">
+            </div>
+            <div class="form-group">
+                <label for="customBlockTypeIDInput">Block Type ID (e.g., "my_smart_valve"):</label>
+                <input type="text" id="customBlockTypeIDInput" placeholder="Unique ID, no spaces/special chars">
+            </div>
+
+            <h3>Ports:</h3>
+            <div id="customPortsContainer">
+                <!-- Port editor rows will be added here -->
+            </div>
+            <button onclick="addPortToEditorConfig()" style="margin-top:10px; background-color: var(--primary-color);">Add Port</button>
+            
+            <hr style="margin: 20px 0;">
+            <button onclick="saveCustomBlock()" style="background-color: var(--info-signal-color); width:auto; padding:10px 20px;">Save Custom Block</button>
         </div>
     </div>
 
@@ -273,6 +247,14 @@
         const svgCanvas = document.getElementById('connection-svg');
         const connectButton = document.getElementById('connectButton');
         const connectModeInfo = document.getElementById('connectModeInfo');
+        
+        // Modal elements
+        const blockEditorModal = document.getElementById('blockEditorModal');
+        const customBlockTitleInput = document.getElementById('customBlockTitleInput');
+        const customBlockTypeIDInput = document.getElementById('customBlockTypeIDInput');
+        const customPortsContainer = document.getElementById('customPortsContainer');
+        const customBlockButtonsContainer = document.getElementById('customBlockButtonsContainer');
+
 
         let blocks = [];
         let connections = [];
@@ -281,102 +263,172 @@
 
         let isDragging = false;
         let dragTarget = null;
-        let initialMouseX, initialMouseY;
-        let initialElementLeft, initialElementTop;
+        let initialMouseX, initialMouseY, initialElementLeft, initialElementTop;
 
         let connectMode = false;
-        let firstPortToConnect = null; // { blockId, portId, portElement }
+        let firstPortToConnect = null;
 
-        // --- BLOCK DEFINITIONS ---
-        const BLOCK_DEFINITIONS = {
+        const PREDEFINED_BLOCK_DEFINITIONS = {
             'heat-pump': {
                 title: "♨️ Heat Pump",
                 ports: [
-                    { id: 'hw_out', label: 'Hot Water Out', type: 'hot-water', side: 'right', align: 0.3 },
-                    { id: 'cw_in', label: 'Cold Water In', type: 'cold-water', side: 'right', align: 0.7 },
+                    { id: 'hw_out', label: 'Hot Water Out', type: 'hot-water', side: 'right', align: 0.25 },
+                    { id: 'cw_in', label: 'Cold Water In', type: 'cold-water', side: 'right', align: 0.75 },
+                    { id: 'power_in', label: 'Power In', type: 'power', side: 'bottom', align: 0.5 },
                     { id: 'signal_in', label: 'Control Signal In', type: 'data-signal', side: 'top', align: 0.5 },
                 ]
             },
             'buffer': {
                 title: "🔋 Buffer Tank",
                 ports: [
-                    { id: 'hw_in_top', label: 'Hot Water In (Top)', type: 'hot-water', side: 'left', align: 0.2 },
-                    { id: 'hw_out_top', label: 'Hot Water Out (Top)', type: 'hot-water', side: 'right', align: 0.2 },
-                    { id: 'cw_in_bottom', label: 'Cold Water In (Bottom)', type: 'cold-water', side: 'left', align: 0.8 },
-                    { id: 'cw_out_bottom', label: 'Cold Water Out (Bottom)', type: 'cold-water', side: 'right', align: 0.8 },
-                    { id: 'sensor_top', label: 'Temp Sensor Top', type: 'data-signal', side: 'top', align: 0.25 },
-                    { id: 'sensor_mid', label: 'Temp Sensor Mid', type: 'data-signal', side: 'top', align: 0.75 },
+                    { id: 'hw_in_top', label: 'Hot In (Top)', type: 'hot-water', side: 'left', align: 0.2 },
+                    { id: 'hw_out_top', label: 'Hot Out (Top)', type: 'hot-water', side: 'right', align: 0.2 },
+                    { id: 'cw_in_bottom', label: 'Cold In (Bottom)', type: 'cold-water', side: 'left', align: 0.8 },
+                    { id: 'cw_out_bottom', label: 'Cold Out (Bottom)', type: 'cold-water', side: 'right', align: 0.8 },
                 ]
             },
-            'input-source': {
-                title: "⚡ Input Source",
-                ports: [
-                    { id: 'hw_out', label: 'Hot Flow Out', type: 'hot-water', side: 'right', align: 0.3 },
-                    { id: 'cw_in', label: 'Cold Flow In', type: 'cold-water', side: 'right', align: 0.7 },
-                ]
-            },
+            'input-source': { title: "⚡ Input Source", ports: [ { id: 'hw_out', label: 'Hot Flow Out', type: 'hot-water', side: 'right', align: 0.5 } ] },
             'heat-user': {
                 title: "🔥 Heat User",
                 ports: [
-                    { id: 'hw_in', label: 'Hot Water Supply', type: 'hot-water', side: 'left', align: 0.3 },
-                    { id: 'cw_out', label: 'Cold Water Return', type: 'cold-water', side: 'left', align: 0.7 },
-                    { id: 'demand_signal', label: 'Heat Demand Signal', type: 'data-signal', side: 'bottom', align: 0.5 },
+                    { id: 'hw_in', label: 'Hot Supply', type: 'hot-water', side: 'left', align: 0.25 },
+                    { id: 'cw_out', label: 'Cold Return', type: 'cold-water', side: 'left', align: 0.75 },
+                    { id: 'power_in', label: 'Power In (Fan/Valve)', type: 'power', side: 'bottom', align: 0.5 },
                 ]
             },
-            'sensor': {
-                title: "🌡️ Sensor",
-                ports: [
-                    { id: 'data_out', label: 'Measured Value Out', type: 'data-signal', side: 'right', align: 0.5 }
-                ]
-            },
-            'text-block': {
-                title: "📝 Text Label",
-                ports: [] // No ports for text block
-            }
+            'sensor': { title: "🌡️ Sensor", ports: [ { id: 'data_out', label: 'Measured Value', type: 'data-signal', side: 'right', align: 0.5 } ] },
+            'power-source': { title: "💡 Power Source", ports: [ { id: 'power_out', label: 'Power Out', type: 'power', side: 'right', align: 0.5 } ] },
+            'text-block': { title: "📝 Text Label", ports: [] }
         };
+        
+        let userDefinedBlockDefinitions = {}; // Stores custom block definitions
+
+        function getBlockDefinition(type) {
+            return PREDEFINED_BLOCK_DEFINITIONS[type] || userDefinedBlockDefinitions[type];
+        }
+
+        // --- Block Editor Functions ---
+        function openBlockEditor() {
+            blockEditorModal.style.display = "flex";
+            customBlockTitleInput.value = "";
+            customBlockTypeIDInput.value = "";
+            customPortsContainer.innerHTML = ""; // Clear previous ports
+            addPortToEditorConfig(); // Add one port row by default
+        }
+        function closeBlockEditor() { blockEditorModal.style.display = "none"; }
+
+        function addPortToEditorConfig() {
+            const portRow = document.createElement('div');
+            portRow.className = 'port-editor-row';
+            portRow.innerHTML = `
+                <input type="text" placeholder="Port Label (e.g. Hot Out)" class="port-label-input">
+                <select class="port-type-select">
+                    <option value="hot-water">Hot Water</option>
+                    <option value="cold-water">Cold Water</option>
+                    <option value="data-signal">Data Signal</option>
+                    <option value="power">Power</option>
+                </select>
+                <select class="port-side-select">
+                    <option value="top">Top</option>
+                    <option value="bottom">Bottom</option>
+                    <option value="left">Left</option>
+                    <option value="right">Right</option>
+                </select>
+                <input type="number" placeholder="Align (0-1)" class="port-align-input" min="0" max="1" step="0.01" value="0.5">
+                <button onclick="this.parentElement.remove()">Remove</button>
+            `;
+            customPortsContainer.appendChild(portRow);
+        }
+
+        function saveCustomBlock() {
+            const title = customBlockTitleInput.value.trim();
+            const typeId = customBlockTypeIDInput.value.trim().replace(/\s+/g, '_').toLowerCase();
+
+            if (!title || !typeId) {
+                alert("Block Title and Type ID are required.");
+                return;
+            }
+            if (getBlockDefinition(typeId)) {
+                alert(`Block Type ID "${typeId}" already exists. Choose a unique ID.`);
+                return;
+            }
+
+            const ports = [];
+            const portRows = customPortsContainer.querySelectorAll('.port-editor-row');
+            let portIdCounter = 0;
+            for (const row of portRows) {
+                const label = row.querySelector('.port-label-input').value.trim();
+                const type = row.querySelector('.port-type-select').value;
+                const side = row.querySelector('.port-side-select').value;
+                const align = parseFloat(row.querySelector('.port-align-input').value);
+
+                if (!label) {
+                    alert("All ports must have a label.");
+                    return;
+                }
+                if (isNaN(align) || align < 0 || align > 1) {
+                    alert("Port alignment must be a number between 0 and 1.");
+                    return;
+                }
+                ports.push({ id: `customport_${portIdCounter++}`, label, type, side, align });
+            }
+
+            userDefinedBlockDefinitions[typeId] = { title, ports, isCustom: true };
+            updateCustomBlockButtons();
+            closeBlockEditor();
+            alert(`Custom block "${title}" saved!`);
+        }
+        
+        function updateCustomBlockButtons() {
+            customBlockButtonsContainer.innerHTML = ""; // Clear existing
+            for (const typeId in userDefinedBlockDefinitions) {
+                const def = userDefinedBlockDefinitions[typeId];
+                const button = document.createElement('button');
+                button.textContent = `Add ${def.title}`;
+                button.onclick = () => addBlock(typeId);
+                // Style custom buttons differently if desired
+                // button.style.backgroundColor = '#your_custom_color'; 
+                customBlockButtonsContainer.appendChild(button);
+            }
+        }
+
+
+        // --- Core Visualizer Logic (Mostly same as before, with minor adjustments) ---
 
         function getPortPosition(blockElement, portDef, portElementSize = 16) {
             const blockWidth = blockElement.offsetWidth;
             const blockHeight = blockElement.offsetHeight;
             const offset = portElementSize / 2;
             let x, y;
-
             switch (portDef.side) {
-                case 'top':    x = blockWidth * portDef.align - offset; y = -offset; break;
-                case 'bottom': x = blockWidth * portDef.align - offset; y = blockHeight - offset; break;
-                case 'left':   x = -offset; y = blockHeight * portDef.align - offset; break;
-                case 'right':  x = blockWidth - offset; y = blockHeight * portDef.align - offset; break;
-                default:       x = blockWidth / 2 - offset; y = blockHeight / 2 - offset; // Default to center if side unknown
+                case 'top':    x = blockWidth * portDef.align - offset; y = -offset -2; break; // -2 to bring slightly outside
+                case 'bottom': x = blockWidth * portDef.align - offset; y = blockHeight - offset + 2; break; // +2
+                case 'left':   x = -offset -2 ; y = blockHeight * portDef.align - offset; break; // -2
+                case 'right':  x = blockWidth - offset + 2; y = blockHeight * portDef.align - offset; break; // +2
+                default:       x = blockWidth / 2 - offset; y = blockHeight / 2 - offset;
             }
             return { x, y };
         }
-
+        
         function addBlock(type) {
-            const definition = BLOCK_DEFINITIONS[type];
-            if (!definition) {
-                console.error("Unknown block type:", type);
-                return;
-            }
+            const definition = getBlockDefinition(type);
+            if (!definition) { console.error("Unknown block type:", type); return; }
 
             const id = `block-${nextBlockId++}`;
-            
             let userLabel = "";
             if (type === 'text-block') {
                 userLabel = prompt("Enter text for the label:", "My Custom Text");
                 if (userLabel === null) return;
-            } else if (type === 'sensor') {
-                 userLabel = prompt(`Label for ${definition.title} (e.g., "Buffer Top Temp"):`, "");
-                 if (userLabel === null) userLabel = ""; // Allow empty if cancelled
-            } else {
+            } else if (type !== 'power-source' && !definition.isCustom && definition.ports.length > 0) { // Don't prompt for power source or custom by default
                  const defaultLabel = prompt(`Optional label for ${definition.title}:`, "");
-                 if (defaultLabel !== null && defaultLabel.trim() !== "") {
-                    userLabel = defaultLabel;
-                 }
+                 if (defaultLabel !== null && defaultLabel.trim() !== "") userLabel = defaultLabel;
             }
+
 
             const blockDiv = document.createElement('div');
             blockDiv.id = id;
-            blockDiv.className = `block ${type}`;
+            blockDiv.className = `block ${type} ${definition.isCustom ? 'custom-block' : ''}`;
+            if(definition.isCustom) blockDiv.style.borderLeft = "5px solid var(--accent-color)"; // Style custom blocks
             
             const titleSpan = document.createElement('span');
             titleSpan.className = 'block-title';
@@ -390,32 +442,22 @@
                 blockDiv.appendChild(labelSpan);
             }
             
-            const initialX = 50 + (blocks.length % 5) * (blockDiv.minWidth || 180); 
-            const initialY = 50 + Math.floor(blocks.length / 5) * (blockDiv.minHeight || 130);
+            const initialX = 50 + (blocks.length % 8) * 190; 
+            const initialY = 50 + Math.floor(blocks.length / 8) * 140;
             blockDiv.style.left = `${initialX}px`;
             blockDiv.style.top = `${initialY}px`;
 
-            // Add Delete Button
             const deleteBtn = document.createElement('span');
             deleteBtn.className = 'delete-btn';
             deleteBtn.innerHTML = '&times;';
             deleteBtn.onclick = (e) => { e.stopPropagation(); deleteBlock(id); };
             blockDiv.appendChild(deleteBtn);
             
-            workspace.appendChild(blockDiv); // Add to DOM to get offsetWidth/Height for ports
+            workspace.appendChild(blockDiv);
 
-            const blockData = {
-                id: id,
-                element: blockDiv,
-                type: type,
-                x: initialX, 
-                y: initialY,
-                ports: [], // Will store actual port elements and their data
-                connections: [] // IDs of connections linked to this block
-            };
+            const blockData = { id, element: blockDiv, type, x: initialX, y: initialY, ports: [], connections: [] };
 
-            // Create and add ports
-            definition.ports.forEach(portDef => {
+            (definition.ports || []).forEach(portDef => {
                 const portId = `${id}_${portDef.id}`;
                 const portElement = document.createElement('div');
                 portElement.id = portId;
@@ -430,150 +472,83 @@
                 labelTip.textContent = portDef.label;
                 portElement.appendChild(labelTip);
 
-                portElement.onclick = (e) => {
-                    e.stopPropagation(); // Prevent block drag start
-                    handlePortClick(blockData, portDef, portElement);
-                };
+                portElement.onclick = (e) => { e.stopPropagation(); handlePortClick(blockData, portDef, portElement); };
                 blockDiv.appendChild(portElement);
-                blockData.ports.push({ 
-                    id: portDef.id, // relative ID within block
-                    fullId: portId, // globally unique ID
-                    definition: portDef, 
-                    element: portElement,
-                    connectedTo: null // { blockId, portId } of the other end
-                });
+                blockData.ports.push({ id: portDef.id, fullId: portId, definition: portDef, element: portElement, connectedTo: null });
             });
             
             blocks.push(blockData);
-            makeDraggable(blockDiv, blockData); 
+            makeDraggable(blockDiv); 
         }
 
-        function makeDraggable(element, blockData) {
+        function makeDraggable(element) {
             element.addEventListener('mousedown', (e) => {
                 if (e.button !== 0 || e.target.classList.contains('delete-btn') || e.target.classList.contains('port')) return;
-                
-                e.preventDefault(); 
-                isDragging = true;
-                dragTarget = element;
-                dragTarget.lastDragTime = 0; 
-                
-                initialMouseX = e.clientX;
-                initialMouseY = e.clientY;
-                initialElementLeft = dragTarget.offsetLeft; 
-                initialElementTop = dragTarget.offsetTop;   
-                
-                dragTarget.style.cursor = 'grabbing';
-                dragTarget.style.zIndex = "1000"; 
+                e.preventDefault(); isDragging = true; dragTarget = element; dragTarget.lastDragTime = 0; 
+                initialMouseX = e.clientX; initialMouseY = e.clientY;
+                initialElementLeft = dragTarget.offsetLeft; initialElementTop = dragTarget.offsetTop;   
+                dragTarget.style.cursor = 'grabbing'; dragTarget.style.zIndex = "1000"; 
             });
         }
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging || !dragTarget) return;
             e.preventDefault(); 
-
-            const deltaX = e.clientX - initialMouseX;
-            const deltaY = e.clientY - initialMouseY;
-
-            let newX = initialElementLeft + deltaX;
-            let newY = initialElementTop + deltaY;
-
-            const blockWidth = dragTarget.offsetWidth;
-            const blockHeight = dragTarget.offsetHeight;
-            const workspaceWidth = workspace.offsetWidth; 
-            const workspaceHeight = workspace.offsetHeight;
-
-            newX = Math.max(0, Math.min(newX, workspaceWidth - blockWidth));
-            newY = Math.max(0, Math.min(newY, workspaceHeight - blockHeight));
-
-            dragTarget.style.left = `${newX}px`;
-            dragTarget.style.top = `${newY}px`;
-
+            const deltaX = e.clientX - initialMouseX, deltaY = e.clientY - initialMouseY;
+            let newX = initialElementLeft + deltaX, newY = initialElementTop + deltaY;
+            newX = Math.max(0, Math.min(newX, workspace.offsetWidth - dragTarget.offsetWidth));
+            newY = Math.max(0, Math.min(newY, workspace.offsetHeight - dragTarget.offsetHeight));
+            dragTarget.style.left = `${newX}px`; dragTarget.style.top = `${newY}px`;
             const blockData = blocks.find(b => b.id === dragTarget.id);
-            if (blockData) {
-                blockData.x = newX; 
-                blockData.y = newY; 
-                updateConnectionsForBlock(blockData.id);
-            }
+            if (blockData) { blockData.x = newX; blockData.y = newY; updateConnectionsForBlock(blockData.id); }
         });
 
         document.addEventListener('mouseup', () => {
             if (isDragging && dragTarget) {
-                dragTarget.style.cursor = 'grab';
-                dragTarget.style.zIndex = ''; 
+                dragTarget.style.cursor = 'grab'; dragTarget.style.zIndex = ''; 
                 dragTarget.lastDragTime = new Date().getTime();
-                isDragging = false;
-                dragTarget = null;
+                isDragging = false; dragTarget = null;
             }
         });
         
         function toggleConnectMode() {
             connectMode = !connectMode;
             const rootStyle = getComputedStyle(document.documentElement); 
-
             if (connectMode) {
                 connectButton.textContent = 'Cancel Connecting';
-                connectButton.style.backgroundColor = rootStyle.getPropertyValue('--accent-color').trim() || '#f5a623';
-                connectModeInfo.style.display = 'block';
-                workspace.style.cursor = 'crosshair';
-                if (firstPortToConnect) {
-                    firstPortToConnect.portElement.classList.remove('selected-for-connection');
-                    firstPortToConnect = null;
-                }
+                connectButton.style.backgroundColor = rootStyle.getPropertyValue('--accent-color').trim();
+                connectModeInfo.style.display = 'block'; workspace.style.cursor = 'crosshair';
+                if (firstPortToConnect) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; }
             } else {
-                connectButton.textContent = 'Start Connecting';
-                connectButton.style.backgroundColor = ''; 
-                connectModeInfo.style.display = 'none';
-                workspace.style.cursor = 'default';
-                if (firstPortToConnect) {
-                    firstPortToConnect.portElement.classList.remove('selected-for-connection');
-                    firstPortToConnect = null; 
-                }
+                connectButton.textContent = 'Start Connecting'; connectButton.style.backgroundColor = ''; 
+                connectModeInfo.style.display = 'none'; workspace.style.cursor = 'default';
+                if (firstPortToConnect) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; }
             }
         }
 
-        function arePortsCompatible(port1Def, port2Def) {
-            // Basic compatibility: same type (hot-water to hot-water, etc.)
-            // More complex rules could be added (e.g. in vs out, but that's harder without defining port directionality)
-            return port1Def.type === port2Def.type;
-        }
+        function arePortsCompatible(port1Def, port2Def) { return port1Def.type === port2Def.type; }
 
         function handlePortClick(blockData, portDef, portElement) {
-            if (!connectMode) return;
-            if (new Date().getTime() - (dragTarget?.lastDragTime || 0) < 100) return; // Avoid click after drag
-
-             // Check if this port is already connected
+            if (!connectMode || (new Date().getTime() - (dragTarget?.lastDragTime || 0) < 100)) return;
             const portData = blockData.ports.find(p => p.fullId === portElement.id);
-            if (portData && portData.connectedTo) {
-                alert(`Port ${portDef.label} is already connected.`);
-                return;
-            }
+            if (portData && portData.connectedTo) { alert(`Port ${portDef.label} is already connected.`); return; }
 
             if (!firstPortToConnect) {
                 firstPortToConnect = { blockData, portDef, portElement };
                 portElement.classList.add('selected-for-connection');
             } else {
-                // Prevent connecting to same block or same port
                 if (firstPortToConnect.blockData.id === blockData.id) {
                     alert("Cannot connect a block to itself.");
-                     if (firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection');
-                    firstPortToConnect = null;
-                    return;
+                    if (firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection');
+                    firstPortToConnect = null; return;
                 }
-                // Check port compatibility
                 if (!arePortsCompatible(firstPortToConnect.portDef, portDef)) {
-                    alert(`Ports are not compatible: ${firstPortToConnect.portDef.type} cannot connect to ${portDef.type}.`);
-                    return;
+                    alert(`Ports not compatible: ${firstPortToConnect.portDef.type} vs ${portDef.type}.`); return;
                 }
-                
                 const secondPortData = blockData.ports.find(p => p.fullId === portElement.id);
-                 if (secondPortData && secondPortData.connectedTo) {
-                    alert(`Port ${portDef.label} on the target block is already connected.`);
-                    return;
-                }
-
+                if (secondPortData && secondPortData.connectedTo) { alert(`Target port ${portDef.label} is already connected.`); return; }
 
                 createConnection(firstPortToConnect, { blockData, portDef, portElement });
-                
                 firstPortToConnect.portElement.classList.remove('selected-for-connection');
                 firstPortToConnect = null; 
             }
@@ -583,15 +558,11 @@
             const block = blocks.find(b => b.id === blockId);
             if (!block) return null;
             const port = block.ports.find(p => p.fullId === portFullId);
-            if (!port) return null;
-
+            if (!port || !port.element) return null; // Ensure port and element exist
             const portRect = port.element.getBoundingClientRect();
             const workspaceRect = workspace.getBoundingClientRect();
-            
-            // Position of port center relative to workspace top-left
-            const x = portRect.left - workspaceRect.left + portRect.width / 2 + workspace.scrollLeft;
-            const y = portRect.top - workspaceRect.top + portRect.height / 2 + workspace.scrollTop;
-            
+            const x = portRect.left - workspaceRect.left + portRect.width / 2 + workspaceContainer.scrollLeft; // Use workspaceContainer for scroll
+            const y = portRect.top - workspaceRect.top + portRect.height / 2 + workspaceContainer.scrollTop;   // Use workspaceContainer for scroll
             return { x, y };
         }
 
@@ -599,56 +570,39 @@
             const connectionId = `conn-${nextConnectionId++}`;
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.id = connectionId;
-            
-            let strokeColor = 'var(--text-color)';
-            let strokeDashArray = "none";
+            let strokeColor = 'var(--text-color)', strokeDashArray = "none", strokeWidth = '3';
 
-            // Determine line style based on port type (assuming compatible types means they are the same)
             switch (port1Info.portDef.type) {
                 case 'hot-water':    strokeColor = 'var(--hot-water-color)'; break;
                 case 'cold-water':   strokeColor = 'var(--cold-water-color)'; break;
                 case 'data-signal':  strokeColor = 'var(--info-signal-color)'; strokeDashArray = "5,5"; break;
+                case 'power':        strokeColor = 'var(--power-color)'; strokeWidth = '4'; break;
             }
-
             line.setAttribute('stroke', strokeColor);
-            line.setAttribute('stroke-width', '3');
+            line.setAttribute('stroke-width', strokeWidth);
             line.setAttribute('stroke-dasharray', strokeDashArray);
-            if (port1Info.portDef.type !== 'data-signal') { // No arrows for data signals for now, or make it different
-                 line.setAttribute('marker-end', 'url(#arrowhead)');
-            }
-
+            if (port1Info.portDef.type !== 'data-signal') line.setAttribute('marker-end', 'url(#arrowhead)');
 
             svgCanvas.appendChild(line);
-            
             const connectionData = {
-                id: connectionId,
-                type: port1Info.portDef.type,
-                fromBlockId: port1Info.blockData.id,
-                fromPortFullId: port1Info.portElement.id, // Use full port ID
-                toBlockId: port2Info.blockData.id,
-                toPortFullId: port2Info.portElement.id,   // Use full port ID
-                element: line
+                id: connectionId, type: port1Info.portDef.type,
+                fromBlockId: port1Info.blockData.id, fromPortFullId: port1Info.portElement.id,
+                toBlockId: port2Info.blockData.id, toPortFullId: port2Info.portElement.id, element: line
             };
             connections.push(connectionData);
-
-            // Update block's connection list and port's connectedTo status
             port1Info.blockData.connections.push(connectionId);
             port2Info.blockData.connections.push(connectionId);
-            
             const p1 = port1Info.blockData.ports.find(p=>p.fullId === port1Info.portElement.id);
             const p2 = port2Info.blockData.ports.find(p=>p.fullId === port2Info.portElement.id);
             if(p1) p1.connectedTo = { blockId: port2Info.blockData.id, portId: port2Info.portDef.id };
             if(p2) p2.connectedTo = { blockId: port1Info.blockData.id, portId: port1Info.portDef.id };
-            
             updateConnectionLine(connectionData);
         }
 
         function updateConnectionLine(connectionData) {
             const pos1 = getPortAbsolutePosition(connectionData.fromBlockId, connectionData.fromPortFullId);
             const pos2 = getPortAbsolutePosition(connectionData.toBlockId, connectionData.toPortFullId);
-
             if (!pos1 || !pos2 || !connectionData.element) return;
-
             connectionData.element.setAttribute('x1', String(pos1.x));
             connectionData.element.setAttribute('y1', String(pos1.y));
             connectionData.element.setAttribute('x2', String(pos2.x));
@@ -657,25 +611,17 @@
 
         function updateConnectionsForBlock(blockId) {
             connections.forEach(conn => {
-                if (conn.fromBlockId === blockId || conn.toBlockId === blockId) {
-                    updateConnectionLine(conn);
-                }
+                if (conn.fromBlockId === blockId || conn.toBlockId === blockId) updateConnectionLine(conn);
             });
         }
 
         function deleteBlock(blockId) {
             const blockIndex = blocks.findIndex(b => b.id === blockId);
             if (blockIndex === -1) return;
-
             const blockData = blocks[blockIndex];
-            
-            // Remove associated connections
             connections = connections.filter(conn => {
                 if (conn.fromBlockId === blockId || conn.toBlockId === blockId) {
-                    if (conn.element && conn.element.parentNode === svgCanvas) {
-                         svgCanvas.removeChild(conn.element);
-                    }
-                    // Clear connectedTo status on the other port
+                    if (conn.element && conn.element.parentNode === svgCanvas) svgCanvas.removeChild(conn.element);
                     const otherBlockId = conn.fromBlockId === blockId ? conn.toBlockId : conn.fromBlockId;
                     const otherPortFullId = conn.fromBlockId === blockId ? conn.toPortFullId : conn.fromPortFullId;
                     const otherBlock = blocks.find(b => b.id === otherBlockId);
@@ -684,69 +630,53 @@
                         if (otherPort) otherPort.connectedTo = null;
                         otherBlock.connections = otherBlock.connections.filter(cId => cId !== conn.id);
                     }
-                    return false; // Remove from connections array
+                    return false;
                 }
                 return true;
             });
-
-            if (blockData.element && blockData.element.parentNode === workspace) {
-                workspace.removeChild(blockData.element);
-            }
+            if (blockData.element && blockData.element.parentNode === workspace) workspace.removeChild(blockData.element);
             blocks.splice(blockIndex, 1);
         }
 
         function clearWorkspace() {
-            if (!confirm("Are you sure you want to clear everything? This action cannot be undone.")) return;
-
-            blocks.forEach(block => {
-                if (block.element && block.element.parentNode === workspace) {
-                    workspace.removeChild(block.element);
-                }
-            });
-            blocks = [];
-            nextBlockId = 0; 
-
-            connections.forEach(conn => {
-                 if (conn.element && conn.element.parentNode === svgCanvas) {
-                    svgCanvas.removeChild(conn.element);
-                 }
-            });
-            connections = [];
-            nextConnectionId = 0;
-
+            if (!confirm("Clear workspace? This cannot be undone.")) return;
+            blocks.forEach(block => { if (block.element && block.element.parentNode === workspace) workspace.removeChild(block.element); });
+            blocks = []; nextBlockId = 0; 
+            connections.forEach(conn => { if (conn.element && conn.element.parentNode === svgCanvas) svgCanvas.removeChild(conn.element); });
+            connections = []; nextConnectionId = 0;
             if (connectMode) toggleConnectMode(); 
-            if (firstPortToConnect) { // Clear any lingering selections
-                 if(firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection');
-                 firstPortToConnect = null;
-            }
+            if (firstPortToConnect) { if(firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; }
         }
 
         function setupSvgDefs() {
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-            
-            // Generic Arrowhead
             const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
             marker.setAttribute('id', 'arrowhead');
-            marker.setAttribute('markerWidth', '10');
-            marker.setAttribute('markerHeight', '7');
-            marker.setAttribute('refX', '8'); 
-            marker.setAttribute('refY', '3.5');
+            marker.setAttribute('markerWidth', '10'); marker.setAttribute('markerHeight', '7');
+            marker.setAttribute('refX', '8'); marker.setAttribute('refY', '3.5');
             marker.setAttribute('orient', 'auto-start-reverse');
             const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
             polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
-            // Arrowhead color will be 'context-stroke' or 'context-fill' if we want it to inherit line color.
-            // For simplicity, let's make it a bit generic or allow CSS to style it.
-            // polygon.setAttribute('fill', 'var(--text-color)'); // Or make it inherit
-            polygon.setAttribute('fill', 'currentColor'); // Inherits stroke color of the line
-            marker.appendChild(polygon);
-            defs.appendChild(marker);
-
+            polygon.setAttribute('fill', 'currentColor'); 
+            marker.appendChild(polygon); defs.appendChild(marker);
             svgCanvas.appendChild(defs);
         }
 
         // Initialize
         setupSvgDefs();
-
+        updateCustomBlockButtons(); // In case any are loaded/persisted in future
+        // Close modal if escape key is pressed
+        window.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && blockEditorModal.style.display === "flex") {
+                closeBlockEditor();
+            }
+        });
+        // Close modal if clicked outside content
+        window.onclick = function(event) {
+            if (event.target == blockEditorModal) {
+                closeBlockEditor();
+            }
+        }
     </script>
 </body>
 </html>
