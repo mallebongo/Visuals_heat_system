@@ -114,6 +114,7 @@
         .heat-user { border-left: 5px solid var(--cold-water-color); }
         .sensor { border-left: 5px solid var(--info-signal-color); }
         .power-source { border-left: 5px solid var(--power-color); }
+        .custom-block { border-left: 5px solid var(--accent-color); } /* Added this for consistency */
         .text-block { background-color: #f9f9f9; border: 2px dashed var(--border-color); min-height: 40px; min-width: 100px; font-style: italic; }
         
         .block-title { font-weight: bold; margin-bottom: 8px; font-size: 1em; }
@@ -247,6 +248,7 @@
         const svgCanvas = document.getElementById('connection-svg');
         const connectButton = document.getElementById('connectButton');
         const connectModeInfo = document.getElementById('connectModeInfo');
+        const workspaceContainer = document.getElementById('workspace-container'); // Needed for scroll reference now
         
         // Modal elements
         const blockEditorModal = document.getElementById('blockEditorModal');
@@ -428,7 +430,7 @@
             const blockDiv = document.createElement('div');
             blockDiv.id = id;
             blockDiv.className = `block ${type} ${definition.isCustom ? 'custom-block' : ''}`;
-            if(definition.isCustom) blockDiv.style.borderLeft = "5px solid var(--accent-color)"; // Style custom blocks
+            // Removed explicit style setting for custom-block border, rely on CSS class from line 139
             
             const titleSpan = document.createElement('span');
             titleSpan.className = 'block-title';
@@ -558,11 +560,20 @@
             const block = blocks.find(b => b.id === blockId);
             if (!block) return null;
             const port = block.ports.find(p => p.fullId === portFullId);
-            if (!port || !port.element) return null; // Ensure port and element exist
+            if (!port || !port.element) return null;
+
             const portRect = port.element.getBoundingClientRect();
-            const workspaceRect = workspace.getBoundingClientRect();
-            const x = portRect.left - workspaceRect.left + portRect.width / 2 + workspaceContainer.scrollLeft; // Use workspaceContainer for scroll
-            const y = portRect.top - workspaceRect.top + portRect.height / 2 + workspaceContainer.scrollTop;   // Use workspaceContainer for scroll
+            // The workspaceRect should be relative to the document for consistent BoundingClientRect calculations
+            const workspaceRect = workspace.getBoundingClientRect(); 
+            
+            // Port center relative to document: portRect.left + portRect.width / 2
+            // Workspace top-left relative to document: workspaceRect.left
+            // So, port center relative to workspace top-left (visual, pre-scroll):
+            // (portRect.left + portRect.width / 2) - workspaceRect.left
+            // Then add workspace's internal scroll to get the coordinate within the full workspace content
+            const x = (portRect.left + portRect.width / 2) - workspaceRect.left + workspaceContainer.scrollLeft;
+            const y = (portRect.top + portRect.height / 2) - workspaceRect.top + workspaceContainer.scrollTop;
+            
             return { x, y };
         }
 
