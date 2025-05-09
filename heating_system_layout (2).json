@@ -1,0 +1,139 @@
+{
+  "blocks": [
+    {
+      "id": "block-0",
+      "type": "heat-pump",
+      "x": 80,
+      "y": 220,
+      "userLabel": ""
+    },
+    {
+      "id": "block-1",
+      "type": "buffer",
+      "x": 620,
+      "y": 160,
+      "userLabel": ""
+    },
+    {
+      "id": "block-2",
+      "type": "blocke",
+      "x": 380,
+      "y": 500,
+      "userLabel": ""
+    },
+    {
+      "id": "block-3",
+      "type": "heat-user",
+      "x": 980,
+      "y": 240,
+      "userLabel": ""
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn-0",
+      "type": "hot-water",
+      "fromBlockId": "block-2",
+      "fromPortRelativeId": "p1",
+      "toBlockId": "block-0",
+      "toPortRelativeId": "hw_out",
+      "inflectionPoints": [
+        {
+          "x": 390,
+          "y": 360
+        },
+        {
+          "x": 360,
+          "y": 360
+        }
+      ]
+    },
+    {
+      "id": "conn-1",
+      "type": "cold-water",
+      "fromBlockId": "block-0",
+      "fromPortRelativeId": "cw_in",
+      "toBlockId": "block-1",
+      "toPortRelativeId": "cw_in_bottom",
+      "inflectionPoints": [
+        {
+          "x": 440,
+          "y": 290
+        },
+        {
+          "x": 440,
+          "y": 290
+        }
+      ]
+    },
+    {
+      "id": "conn-2",
+      "type": "hot-water",
+      "fromBlockId": "block-1",
+      "fromPortRelativeId": "hw_out_top",
+      "toBlockId": "block-3",
+      "toPortRelativeId": "hw_in",
+      "inflectionPoints": [
+        {
+          "x": 860,
+          "y": 190
+        },
+        {
+          "x": 860,
+          "y": 250
+        }
+      ]
+    },
+    {
+      "id": "conn-3",
+      "type": "cold-water",
+      "fromBlockId": "block-3",
+      "fromPortRelativeId": "cw_out",
+      "toBlockId": "block-1",
+      "toPortRelativeId": "cw_out_bottom",
+      "inflectionPoints": [
+        {
+          "x": 860,
+          "y": 290
+        },
+        {
+          "x": 860,
+          "y": 290
+        }
+      ]
+    }
+  ],
+  "userDefinedBlockDefinitions": {
+    "blocke": {
+      "title": "BLOKIE",
+      "width": 8,
+      "height": 8,
+      "ports": [
+        {
+          "id": "p0",
+          "label": "2",
+          "type": "hot-water",
+          "side": "top",
+          "align": 1
+        },
+        {
+          "id": "p1",
+          "label": "2",
+          "type": "hot-water",
+          "side": "top",
+          "align": 0
+        },
+        {
+          "id": "p2",
+          "label": "3",
+          "type": "hot-water",
+          "side": "top",
+          "align": 2
+        }
+      ],
+      "isCustom": true
+    }
+  },
+  "nextBlockId": 4,
+  "nextConnectionId": 4
+}
