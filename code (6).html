@@ -153,11 +153,17 @@
         </div>
     </div>
 
-    <script>
+        <script>
         // --- Global Constants & Variables (GRID_SIZE, workspace, svgCanvas, etc.) ---
         const GRID_SIZE = 20;
         document.documentElement.style.setProperty('--grid-size', `${GRID_SIZE}px`);
-        const workspace = document.getElementById('workspace'); /* ... other global DOM elements ... */
+
+        // ADDED THIS FUNCTION DEFINITION BACK:
+        function snapToGrid(value) {
+            return Math.round(value / GRID_SIZE) * GRID_SIZE;
+        }
+
+        const workspace = document.getElementById('workspace');
         const svgCanvas = document.getElementById('connection-svg');
         const connectButton = document.getElementById('connectButton');
         const editLineButton = document.getElementById('editLineButton');
@@ -166,7 +172,7 @@
         const workspaceContainer = document.getElementById('workspace-container');
         
         const blockEditorModal = document.getElementById('blockEditorModal');
-        const visualEditorPane = document.getElementById('visualEditorPane'); // For attaching event listeners to inputs
+        const visualEditorPane = document.getElementById('visualEditorPane');
         const customBlockTitleInput = document.getElementById('customBlockTitleInput');
         const customBlockTypeIDInput = document.getElementById('customBlockTypeIDInput');
         const customBlockWidthInput = document.getElementById('customBlockWidthInput');
@@ -184,10 +190,10 @@
         let connectMode = false; let lineEditMode = false;
         let firstPortToConnect = null; let selectedConnection = null; let draggingHandle = null;
 
-        let currentEditingBlockDef = {}; // Holds the block definition being edited
-        let isUpdatingFromCode = false; // Flag to prevent infinite loops in sync
+        let currentEditingBlockDef = {}; 
+        let isUpdatingFromCode = false; 
 
-        const PREDEFINED_BLOCK_DEFINITIONS = { /* ... same as before ... */
+        const PREDEFINED_BLOCK_DEFINITIONS = {
             'heat-pump': { title: "♨️ Heat Pump", width: 8, height: 5, ports: [ { id: 'hw_out', label: 'Hot Out', type: 'hot-water', side: 'right', align: 1 }, { id: 'cw_in', label: 'Cold In', type: 'cold-water', side: 'right', align: 3 }, { id: 'power_in', label: 'Power In', type: 'power', side: 'bottom', align: 3 }, { id: 'signal_in', label: 'Control In', type: 'data-signal', side: 'top', align: 3 }, ] },
             'buffer': { title: "🔋 Buffer Tank", width: 6, height: 8, ports: [ { id: 'hw_in_top', label: 'Hot In', type: 'hot-water', side: 'left', align: 1 }, { id: 'hw_out_top', label: 'Hot Out', type: 'hot-water', side: 'right', align: 1 }, { id: 'cw_in_bottom', label: 'Cold In', type: 'cold-water', side: 'left', align: 6 }, { id: 'cw_out_bottom', label: 'Cold Out', type: 'cold-water', side: 'right', align: 6 }, ] },
             'input-source': { title: "⚡ Input Source", width: 6, height: 3, ports: [ { id: 'hw_out', label: 'Hot Out', type: 'hot-water', side: 'right', align: 1 } ] },
@@ -202,15 +208,14 @@
         // --- Block Editor: Dual Syncing Logic ---
         function openBlockEditor() {
             blockEditorModal.style.display = "flex";
-            // Initialize currentEditingBlockDef with defaults or an empty structure
             currentEditingBlockDef = { title: "", typeId: "", width: 8, height: 5, ports: [] };
             syncCurrentDefToVisualForm();
-            syncCurrentDefToTextEditor(); // This will also trigger preview update
-            updateJsonError(""); // Clear any old errors
+            syncCurrentDefToTextEditor(); 
+            updateJsonError(""); 
         }
         function closeBlockEditor() { blockEditorModal.style.display = "none"; }
 
-        function syncVisualToCurrentDef() { // Called oninput from visual form fields
+        function syncVisualToCurrentDef() { 
             if (isUpdatingFromCode) return;
             currentEditingBlockDef.title = customBlockTitleInput.value.trim();
             currentEditingBlockDef.typeId = customBlockTypeIDInput.value.trim().replace(/\s+/g, '_').toLowerCase();
@@ -222,40 +227,34 @@
                 const type = row.querySelector('.port-type-select').value;
                 const side = row.querySelector('.port-side-select').value;
                 const align = parseInt(row.querySelector('.port-align-input').value);
-                if (label && !isNaN(align)) { // Basic validation
+                if (label && !isNaN(align)) { 
                     currentEditingBlockDef.ports.push({ id: `p${index}`, label, type, side, align });
                 }
             });
-            // Ensure align values are valid after width/height change
             currentEditingBlockDef.ports.forEach(port => {
                 let maxAlign = (port.side === 'top' || port.side === 'bottom') ? currentEditingBlockDef.width - 1 : currentEditingBlockDef.height - 1;
-                maxAlign = Math.max(0, maxAlign); // Ensure maxAlign is not negative
+                maxAlign = Math.max(0, maxAlign); 
                 port.align = Math.min(Math.max(0, port.align), maxAlign);
             });
-
-            syncCurrentDefToTextEditor(); // Update text editor and preview
+            syncCurrentDefToTextEditor(); 
         }
 
-        function syncTextToCurrentDef() { // Called oninput from textarea
+        function syncTextToCurrentDef() { 
             if (isUpdatingFromCode) return;
             try {
                 const newDef = JSON.parse(blockDefinitionText.value);
-                // Basic validation of loaded structure
                 if (typeof newDef.title === 'string' && typeof newDef.width === 'number' && typeof newDef.height === 'number' && Array.isArray(newDef.ports)) {
-                    currentEditingBlockDef = { // Create a clean object to avoid carrying over old properties
+                    currentEditingBlockDef = { 
                         title: newDef.title,
-                        typeId: customBlockTypeIDInput.value.trim().replace(/\s+/g, '_').toLowerCase(), // Keep Type ID from form for now
+                        typeId: customBlockTypeIDInput.value.trim().replace(/\s+/g, '_').toLowerCase(), 
                         width: newDef.width,
                         height: newDef.height,
-                        ports: newDef.ports.map((p, i) => ({ // Sanitize ports
-                            id: p.id || `p${i}`,
-                            label: p.label || "",
-                            type: p.type || "data-signal",
-                            side: p.side || "right",
-                            align: parseInt(p.align) || 0
+                        ports: newDef.ports.map((p, i) => ({ 
+                            id: p.id || `p${i}`, label: p.label || "", type: p.type || "data-signal",
+                            side: p.side || "right", align: parseInt(p.align) || 0
                         }))
                     };
-                    syncCurrentDefToVisualForm(); // Update visual form and preview
+                    syncCurrentDefToVisualForm(); 
                     updateJsonError("");
                 } else {
                     updateJsonError("Invalid block structure in JSON.");
@@ -271,7 +270,7 @@
             customBlockTypeIDInput.value = currentEditingBlockDef.typeId || "";
             customBlockWidthInput.value = currentEditingBlockDef.width || 8;
             customBlockHeightInput.value = currentEditingBlockDef.height || 5;
-            customPortsContainer.innerHTML = ""; // Clear and rebuild port rows
+            customPortsContainer.innerHTML = ""; 
             (currentEditingBlockDef.ports || []).forEach(port => {
                 addPortToEditorForm(port);
             });
@@ -281,22 +280,19 @@
 
         function syncCurrentDefToTextEditor() {
             isUpdatingFromCode = true;
-            // Create a definition for JSON without the typeId (as it's separate)
             const defForJson = { 
-                title: currentEditingBlockDef.title, 
-                width: currentEditingBlockDef.width, 
-                height: currentEditingBlockDef.height, 
-                ports: currentEditingBlockDef.ports 
+                title: currentEditingBlockDef.title, width: currentEditingBlockDef.width, 
+                height: currentEditingBlockDef.height, ports: currentEditingBlockDef.ports 
             };
             blockDefinitionText.value = JSON.stringify(defForJson, null, 2);
             updateBlockPreview();
-            updateJsonError(""); // Clear error if text was updated successfully from visual
+            updateJsonError(""); 
             isUpdatingFromCode = false;
         }
         
         function updateJsonError(message) { jsonErrorDisplay.textContent = message; }
 
-        function addPortToEditorForm(portData = null) { // Can take port data to populate
+        function addPortToEditorForm(portData = null) { 
             const portRow = document.createElement('div'); portRow.className = 'port-editor-row';
             portRow.innerHTML = `
                 <input type="text" placeholder="Port Label" class="port-label-input" value="${portData?.label || ''}" oninput="syncVisualToCurrentDef()">
@@ -306,66 +302,63 @@
                 <button onclick="this.parentElement.remove(); syncVisualToCurrentDef();">X</button>
             `;
             customPortsContainer.appendChild(portRow);
-            updateAlignMaxFromVisual(portRow.querySelector('.port-side-select')); // Set initial max
-             if (!portData) syncVisualToCurrentDef(); // If adding a new blank port, update currentDef
+            updateAlignMaxFromVisual(portRow.querySelector('.port-side-select')); 
+             if (!portData) syncVisualToCurrentDef(); 
         }
         
-        // Update align max when side changes in visual editor
         function updateAlignMaxFromVisual(sideSelectElement) {
             const portRow = sideSelectElement.closest('.port-editor-row');
             const alignInput = portRow.querySelector('.port-align-input');
             const side = sideSelectElement.value;
-            const blockWidth = parseInt(customBlockWidthInput.value) || 1; // Use current form values
+            const blockWidth = parseInt(customBlockWidthInput.value) || 1; 
             const blockHeight = parseInt(customBlockHeightInput.value) || 1;
             let maxAlign = (side === 'top' || side === 'bottom') ? blockWidth - 1 : blockHeight - 1;
-            maxAlign = Math.max(0, maxAlign); // Ensure non-negative
+            maxAlign = Math.max(0, maxAlign); 
             alignInput.max = maxAlign;
             if (parseInt(alignInput.value) > maxAlign) alignInput.value = maxAlign;
             if (parseInt(alignInput.value) < 0) alignInput.value = 0;
         }
-        // Add event listeners to width/height inputs to update all align max values
-        customBlockWidthInput.addEventListener('input', () => { customPortsContainer.querySelectorAll('.port-side-select').forEach(sel => updateAlignMaxFromVisual(sel)); });
-        customBlockHeightInput.addEventListener('input', () => { customPortsContainer.querySelectorAll('.port-side-select').forEach(sel => updateAlignMaxFromVisual(sel)); });
+        customBlockWidthInput.addEventListener('input', () => { customPortsContainer.querySelectorAll('.port-side-select').forEach(sel => updateAlignMaxFromVisual(sel)); syncVisualToCurrentDef(); }); // Also sync on main dimension change
+        customBlockHeightInput.addEventListener('input', () => { customPortsContainer.querySelectorAll('.port-side-select').forEach(sel => updateAlignMaxFromVisual(sel)); syncVisualToCurrentDef(); });
 
 
         function saveCustomBlockFromEditor() {
             const typeId = currentEditingBlockDef.typeId;
             if (!currentEditingBlockDef.title || !typeId) { alert("Block Title and Type ID are required."); return; }
             if (PREDEFINED_BLOCK_DEFINITIONS[typeId] || (userDefinedBlockDefinitions[typeId] && typeId !== (window._editingExistingBlockId || null) )) { 
-                // Allow overwrite if editing existing block, otherwise check for new collision
                 alert(`Block Type ID "${typeId}" already exists or is a predefined ID. Choose a unique ID.`); 
                 return; 
             }
             if (currentEditingBlockDef.width < 1 || currentEditingBlockDef.height < 1) { alert("Width/Height must be at least 1."); return; }
-            // Further validation for ports (e.g., align within bounds)
-            currentEditingBlockDef.ports.forEach(port => {
-                let maxAlign = (port.side === 'top' || port.side === 'bottom') ? currentEditingBlockDef.width - 1 : currentEditingBlockDef.height - 1;
-                maxAlign = Math.max(0,maxAlign);
-                if (port.align < 0 || port.align > maxAlign) {
-                    alert(`Port "${port.label}" align value ${port.align} is out of bounds (0-${maxAlign}). Please correct in visual or text editor.`);
-                    throw new Error("Invalid port align"); // Stop saving
-                }
-            });
-
+            try {
+                currentEditingBlockDef.ports.forEach(port => {
+                    let maxAlign = (port.side === 'top' || port.side === 'bottom') ? currentEditingBlockDef.width - 1 : currentEditingBlockDef.height - 1;
+                    maxAlign = Math.max(0,maxAlign);
+                    if (port.align < 0 || port.align > maxAlign) {
+                        throw new Error(`Port "${port.label}" align value ${port.align} is out of bounds (0-${maxAlign}). Please correct in visual or text editor.`);
+                    }
+                });
+            } catch (e) {
+                alert(e.message);
+                return; // Stop saving
+            }
 
             userDefinedBlockDefinitions[typeId] = { 
-                title: currentEditingBlockDef.title, 
-                width: currentEditingBlockDef.width, 
+                title: currentEditingBlockDef.title, width: currentEditingBlockDef.width, 
                 height: currentEditingBlockDef.height, 
-                ports: currentEditingBlockDef.ports.map((p,idx) => ({...p, id: p.id || `cp_${idx}`})), // ensure port IDs
+                ports: currentEditingBlockDef.ports.map((p,idx) => ({...p, id: p.id || `cp_${idx}`})), 
                 isCustom: true 
             };
             updateCustomBlockButtons(); closeBlockEditor(); alert(`Custom block "${currentEditingBlockDef.title}" saved!`);
-            window._editingExistingBlockId = null; // Clear editing state
+            window._editingExistingBlockId = null; 
         }
         
-        // --- Live Preview ---
         function updateBlockPreview() {
-            blockPreviewSvg.innerHTML = ''; // Clear previous preview
+            blockPreviewSvg.innerHTML = ''; 
             const def = currentEditingBlockDef;
-            if (!def || !def.width || !def.height) return;
+            if (!def || !def.width || !def.height || def.width < 1 || def.height < 1) return; // Ensure valid dimensions
 
-            const previewGridSize = 10; // Smaller grid for preview
+            const previewGridSize = 10; 
             const blockWidthPx = def.width * previewGridSize;
             const blockHeightPx = def.height * previewGridSize;
             const padding = 20;
@@ -374,29 +367,24 @@
             blockPreviewSvg.setAttribute('height', blockHeightPx + padding * 2);
             
             const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            group.setAttribute('transform', `translate(${padding}, ${padding})`); // Add padding
+            group.setAttribute('transform', `translate(${padding}, ${padding})`); 
 
             const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             rect.setAttribute('x', 0); rect.setAttribute('y', 0);
             rect.setAttribute('width', blockWidthPx); rect.setAttribute('height', blockHeightPx);
-            rect.setAttribute('fill', 'var(--block-bg)');
-            rect.setAttribute('stroke', 'var(--border-color)');
-            rect.setAttribute('stroke-width', '1');
-            rect.setAttribute('rx', '4');
+            rect.setAttribute('fill', 'var(--block-bg)'); rect.setAttribute('stroke', 'var(--border-color)');
+            rect.setAttribute('stroke-width', '1'); rect.setAttribute('rx', '4');
             group.appendChild(rect);
 
             (def.ports || []).forEach(portDef => {
-                const portVisualSize = 8; // Smaller ports for preview
-                // Use a simplified getPortPixelPositionOnBlock for preview
+                const portVisualSize = 8; 
                 const portPos = getPreviewPortPosition(def, portDef, previewGridSize, portVisualSize);
-                
                 const portCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                portCircle.setAttribute('cx', portPos.displayX);
-                portCircle.setAttribute('cy', portPos.displayY);
+                portCircle.setAttribute('cx', portPos.displayX + portVisualSize/2); // Center the circle
+                portCircle.setAttribute('cy', portPos.displayY + portVisualSize/2); // Center the circle
                 portCircle.setAttribute('r', portVisualSize / 2);
                 portCircle.setAttribute('fill', `var(--${portDef.type}-color)`);
-                portCircle.setAttribute('stroke', '#555');
-                portCircle.setAttribute('stroke-width', '0.5');
+                portCircle.setAttribute('stroke', '#555'); portCircle.setAttribute('stroke-width', '0.5');
                 group.appendChild(portCircle);
             });
             blockPreviewSvg.appendChild(group);
@@ -405,33 +393,24 @@
         function getPreviewPortPosition(blockDef, portDef, gridSize, portVisualSize) {
             const blockWidthPx = blockDef.width * gridSize;
             const blockHeightPx = blockDef.height * gridSize;
-            const offset = portVisualSize / 2;
-            let displayX, displayY;
+            let displayX, displayY; // Top-left of the port dot
 
             switch (portDef.side) {
-                case 'top':    displayX = (portDef.align * gridSize) + (gridSize / 2) - offset; displayY = 0 - offset; break;
-                case 'bottom': displayX = (portDef.align * gridSize) + (gridSize / 2) - offset; displayY = blockHeightPx - offset; break;
-                case 'left':   displayX = 0 - offset; displayY = (portDef.align * gridSize) + (gridSize / 2) - offset; break;
-                case 'right':  displayX = blockWidthPx - offset; displayY = (portDef.align * gridSize) + (gridSize / 2) - offset; break;
-                default:       displayX = blockWidthPx / 2 - offset; displayY = blockHeightPx / 2 - offset;
+                case 'top':    displayX = (portDef.align * gridSize) + (gridSize / 2) - (portVisualSize / 2); displayY = 0 - (portVisualSize / 2) ; break;
+                case 'bottom': displayX = (portDef.align * gridSize) + (gridSize / 2) - (portVisualSize / 2); displayY = blockHeightPx - (portVisualSize / 2); break;
+                case 'left':   displayX = 0 - (portVisualSize / 2); displayY = (portDef.align * gridSize) + (gridSize / 2) - (portVisualSize / 2); break;
+                case 'right':  displayX = blockWidthPx - (portVisualSize / 2); displayY = (portDef.align * gridSize) + (gridSize / 2) - (portVisualSize / 2); break;
+                default:       displayX = blockWidthPx / 2 - (portVisualSize / 2); displayY = blockHeightPx / 2 - (portVisualSize / 2);
             }
-             // Clamp displayX/Y to be within the block bounds for the dot
-            displayX = Math.max(-offset, Math.min(displayX, blockWidthPx - offset));
-            displayY = Math.max(-offset, Math.min(displayY, blockHeightPx - offset));
-
             return { displayX, displayY };
         }
 
-
         // --- Rest of the application logic (addBlock, makeDraggable, connections, save/load, etc.) ---
-        // Minor change: addBlock calls makeDraggable only if not loadedBlockData
-        // Minor change: createConnection and others will use this updated userDefinedBlockDefinitions
-        // All other functions like snapToGrid, getPortPixelPositionOnBlock (for main workspace), 
-        // mouse events, connection logic, save/load etc. remain largely THE SAME as the previous "Grid-Aligned Port Visualizer"
-        // Ensure that all these functions correctly use `getBlockDefinition(type)` to fetch definitions.
+        // These functions should be the same as the "Grid-Aligned Port Visualizer" version
+        // with the `snapToGrid` function correctly defined.
         function updateCustomBlockButtons() { customBlockButtonsContainer.innerHTML = ""; for (const typeId in userDefinedBlockDefinitions) { const def = userDefinedBlockDefinitions[typeId]; const btn = document.createElement('button'); btn.textContent = `Add ${def.title}`; btn.onclick = () => addBlock(typeId); customBlockButtonsContainer.appendChild(btn); } }
         function getPortPixelPositionOnBlock(blockDef, portDef, portElementSize = 16) { const blockWidthPx = blockDef.width * GRID_SIZE; const blockHeightPx = blockDef.height * GRID_SIZE; const portVisualOffset = portElementSize / 2; const portConnectionOffset = GRID_SIZE / 2; let cx, cy; let displayX, displayY; switch (portDef.side) { case 'top': cx = portDef.align * GRID_SIZE + GRID_SIZE / 2; cy = -portConnectionOffset; displayX = cx - portVisualOffset; displayY = 0 - portVisualOffset; break; case 'bottom': cx = portDef.align * GRID_SIZE + GRID_SIZE / 2; cy = blockHeightPx + portConnectionOffset; displayX = cx - portVisualOffset; displayY = blockHeightPx - portVisualOffset; break; case 'left': cx = -portConnectionOffset; cy = portDef.align * GRID_SIZE + GRID_SIZE / 2; displayX = 0 - portVisualOffset; displayY = cy - portVisualOffset; break; case 'right': cx = blockWidthPx + portConnectionOffset; cy = portDef.align * GRID_SIZE + GRID_SIZE / 2; displayX = blockWidthPx - portVisualOffset; displayY = cy - portVisualOffset; break; default: cx = blockWidthPx / 2; cy = blockHeightPx / 2; displayX = cx - portVisualOffset; displayY = cy - portVisualOffset; } return { x: cx, y: cy, displayX, displayY }; }
-        function addBlock(type, loadedBlockData = null) { const definition = getBlockDefinition(type); if (!definition) { console.error("Unknown block type:", type); return null; } const id = loadedBlockData ? loadedBlockData.id : `block-${nextBlockId++}`; let userLabel = loadedBlockData ? loadedBlockData.userLabel : ""; if (!loadedBlockData && type === 'text-block') { userLabel = prompt("Label:", "My Text"); if (userLabel === null) return null; } else if (!loadedBlockData && type !== 'power-source' && !definition.isCustom && (definition.ports || []).length > 0) { const defaultLabel = prompt(`Label for ${definition.title}:`, ""); if (defaultLabel !== null && defaultLabel.trim() !== "") userLabel = defaultLabel; } const blockDiv = document.createElement('div'); blockDiv.id = id; blockDiv.className = `block ${type} ${definition.isCustom ? 'custom-block' : ''}`; blockDiv.style.width = `${definition.width * GRID_SIZE}px`; blockDiv.style.height = `${definition.height * GRID_SIZE}px`; const titleSpan = document.createElement('span'); titleSpan.className = 'block-title'; titleSpan.textContent = definition.title; blockDiv.appendChild(titleSpan); if (userLabel) { const labelSpan = document.createElement('span'); labelSpan.className = 'block-label'; labelSpan.textContent = userLabel; blockDiv.appendChild(labelSpan); } const initialX = loadedBlockData ? loadedBlockData.x : snapToGrid(50 + (blocks.length % 6) * (definition.width + 2) * GRID_SIZE); const initialY = loadedBlockData ? loadedBlockData.y : snapToGrid(50 + Math.floor(blocks.length / 6) * (definition.height + 2) * GRID_SIZE); blockDiv.style.left = `${initialX}px`; blockDiv.style.top = `${initialY}px`; const deleteBtn = document.createElement('span'); deleteBtn.className = 'delete-btn'; deleteBtn.innerHTML = '&times;'; deleteBtn.onclick = (e) => { e.stopPropagation(); deleteBlock(id); }; blockDiv.appendChild(deleteBtn); workspace.appendChild(blockDiv); const blockData = { id, element: blockDiv, type, definition, x: initialX, y: initialY, ports: [], connections: [], userLabel }; (definition.ports || []).forEach(portDef => { const portId = `${id}_${portDef.id}`; const portElement = document.createElement('div'); portElement.id = portId; portElement.className = `port ${portDef.type}`; const pos = getPortPixelPositionOnBlock(definition, portDef); portElement.style.left = `${pos.displayX}px`; portElement.style.top = `${pos.displayY}px`; const labelTip = document.createElement('span'); labelTip.className = 'port-label-tip'; labelTip.textContent = portDef.label; portElement.appendChild(labelTip); portElement.onclick = (e) => { e.stopPropagation(); handlePortClick(blockData, portDef, portElement); }; blockDiv.appendChild(portElement); blockData.ports.push({ id: portDef.id, fullId: portId, definition: portDef, element: portElement, connectedToCount: 0 }); }); blocks.push(blockData); if (!loadedBlockData) makeDraggable(blockDiv, blockData); else { blockData.element.style.transition = 'none'; makeDraggable(blockDiv, blockData); /* Ensure draggable is added for loaded blocks too */ } return blockData; }
+        function addBlock(type, loadedBlockData = null) { const definition = getBlockDefinition(type); if (!definition) { console.error("Unknown block type:", type); return null; } const id = loadedBlockData ? loadedBlockData.id : `block-${nextBlockId++}`; let userLabel = loadedBlockData ? loadedBlockData.userLabel : ""; if (!loadedBlockData && type === 'text-block') { userLabel = prompt("Label:", "My Text"); if (userLabel === null) return null; } else if (!loadedBlockData && type !== 'power-source' && !definition.isCustom && (definition.ports || []).length > 0) { const defaultLabel = prompt(`Label for ${definition.title}:`, ""); if (defaultLabel !== null && defaultLabel.trim() !== "") userLabel = defaultLabel; } const blockDiv = document.createElement('div'); blockDiv.id = id; blockDiv.className = `block ${type} ${definition.isCustom ? 'custom-block' : ''}`; blockDiv.style.width = `${definition.width * GRID_SIZE}px`; blockDiv.style.height = `${definition.height * GRID_SIZE}px`; const titleSpan = document.createElement('span'); titleSpan.className = 'block-title'; titleSpan.textContent = definition.title; blockDiv.appendChild(titleSpan); if (userLabel) { const labelSpan = document.createElement('span'); labelSpan.className = 'block-label'; labelSpan.textContent = userLabel; blockDiv.appendChild(labelSpan); } const initialX = loadedBlockData ? loadedBlockData.x : snapToGrid(50 + (blocks.length % 6) * (definition.width + 2) * GRID_SIZE); const initialY = loadedBlockData ? loadedBlockData.y : snapToGrid(50 + Math.floor(blocks.length / 6) * (definition.height + 2) * GRID_SIZE); blockDiv.style.left = `${initialX}px`; blockDiv.style.top = `${initialY}px`; const deleteBtn = document.createElement('span'); deleteBtn.className = 'delete-btn'; deleteBtn.innerHTML = '×'; deleteBtn.onclick = (e) => { e.stopPropagation(); deleteBlock(id); }; blockDiv.appendChild(deleteBtn); workspace.appendChild(blockDiv); const blockData = { id, element: blockDiv, type, definition, x: initialX, y: initialY, ports: [], connections: [], userLabel }; (definition.ports || []).forEach(portDef => { const portId = `${id}_${portDef.id}`; const portElement = document.createElement('div'); portElement.id = portId; portElement.className = `port ${portDef.type}`; const pos = getPortPixelPositionOnBlock(definition, portDef); portElement.style.left = `${pos.displayX}px`; portElement.style.top = `${pos.displayY}px`; const labelTip = document.createElement('span'); labelTip.className = 'port-label-tip'; labelTip.textContent = portDef.label; portElement.appendChild(labelTip); portElement.onclick = (e) => { e.stopPropagation(); handlePortClick(blockData, portDef, portElement); }; blockDiv.appendChild(portElement); blockData.ports.push({ id: portDef.id, fullId: portId, definition: portDef, element: portElement, connectedToCount: 0 }); }); blocks.push(blockData); if (!loadedBlockData) makeDraggable(blockDiv, blockData); else { blockData.element.style.transition = 'none'; makeDraggable(blockDiv, blockData); } return blockData; }
         function makeDraggable(element, blockData) { element.addEventListener('mousedown', (e) => { if (e.button !== 0 || e.target.classList.contains('delete-btn') || e.target.classList.contains('port')) return; e.preventDefault(); isDragging = true; dragTarget = element; dragTarget.lastDragTime = 0; initialMouseX = e.clientX; initialMouseY = e.clientY; initialElementLeft = dragTarget.offsetLeft; initialElementTop = dragTarget.offsetTop; dragTarget.style.cursor = 'grabbing'; dragTarget.style.zIndex = "1000"; dragTarget.style.transition = 'none'; }); }
         document.addEventListener('mousemove', (e) => { if (isDragging && dragTarget) { e.preventDefault(); const deltaX = e.clientX - initialMouseX, deltaY = e.clientY - initialMouseY; let newX = initialElementLeft + deltaX, newY = initialElementTop + deltaY; dragTarget.style.left = `${newX}px`; dragTarget.style.top = `${newY}px`; const blockData = blocks.find(b => b.id === dragTarget.id); if (blockData) { blockData.x = newX; blockData.y = newY; updateConnectionsForBlock(blockData.id); } } else if (draggingHandle) { e.preventDefault(); const { connection, handleIndex } = draggingHandle; const s = getPortAbsoluteConnectionPoint(connection.fromBlockId, connection.fromPortFullId); const workspaceRect = workspace.getBoundingClientRect(); let mouseX = snapToGrid(e.clientX - workspaceRect.left + workspaceContainer.scrollLeft); let mouseY = snapToGrid(e.clientY - workspaceRect.top + workspaceContainer.scrollTop); if (handleIndex === 0) { if (s.side === 'left' || s.side === 'right') { connection.inflectionPoints[0].x = mouseX; connection.inflectionPoints[1].x = mouseX; } else { connection.inflectionPoints[0].y = mouseY; connection.inflectionPoints[1].y = mouseY; } } else if (handleIndex === 1) { if (s.side === 'left' || s.side === 'right') { connection.inflectionPoints[1].y = mouseY; } else { connection.inflectionPoints[1].x = mouseX; } } calculateAndDrawPath(connection, false); updateLineHandles(connection); } });
         document.addEventListener('mouseup', () => { if (isDragging && dragTarget) { dragTarget.style.cursor = 'grab'; dragTarget.style.zIndex = ''; dragTarget.lastDragTime = new Date().getTime(); const blockData = blocks.find(b => b.id === dragTarget.id); if (blockData) { blockData.x = snapToGrid(dragTarget.offsetLeft); blockData.y = snapToGrid(dragTarget.offsetTop); dragTarget.style.left = `${blockData.x}px`; dragTarget.style.top = `${blockData.y}px`; updateConnectionsForBlock(blockData.id); } dragTarget.style.transition = 'left 0.1s ease-out, top 0.1s ease-out'; isDragging = false; dragTarget = null; } if (draggingHandle) { draggingHandle = null; } });
