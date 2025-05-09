@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Heating & Power System Visualizer</title>
+    <title>Grid-Based System Visualizer</title>
     <style>
         :root {
             --bg-color: #f0f4f8;
@@ -14,97 +14,78 @@
             --border-color: #d0d0d0;
             --block-bg: #ffffff;
             --shadow-color: rgba(0,0,0,0.1);
+            --grid-line-color: rgba(0,0,0,0.1); /* Lighter grid lines */
+            --grid-size: 20px; /* Define grid size in CSS for visual consistency */
 
             --hot-water-color: #e74c3c;
             --cold-water-color: #3498db;
             --info-signal-color: #2ecc71;
-            --power-color: #9b59b6; /* Purple for Power */
+            --power-color: #9b59b6;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0;
+            background-color: var(--bg-color); color: var(--text-color);
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
         }
 
         .header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 15px 20px;
-            text-align: center;
-            font-size: 1.5em;
-            box-shadow: 0 2px 4px var(--shadow-color);
-            z-index: 100;
+            background-color: var(--primary-color); color: white; padding: 15px 20px;
+            text-align: center; font-size: 1.5em; box-shadow: 0 2px 4px var(--shadow-color); z-index: 100;
         }
 
         .main-container { display: flex; flex-grow: 1; overflow: hidden; }
 
         #controls {
-            width: 300px; /* Wider for more buttons */
-            padding: 20px;
-            background-color: #fff;
-            border-right: 1px solid var(--border-color);
-            box-shadow: 2px 0 5px var(--shadow-color);
-            overflow-y: auto;
-            flex-shrink: 0;
+            width: 300px; padding: 20px; background-color: #fff;
+            border-right: 1px solid var(--border-color); box-shadow: 2px 0 5px var(--shadow-color);
+            overflow-y: auto; flex-shrink: 0;
         }
-
         #controls h2, #controls h3 {
-            margin-top: 20px;
-            margin-bottom: 10px;
-            color: var(--primary-color);
-            border-bottom: 2px solid var(--secondary-color);
-            padding-bottom: 8px;
+            margin-top: 20px; margin-bottom: 10px; color: var(--primary-color);
+            border-bottom: 2px solid var(--secondary-color); padding-bottom: 8px;
         }
         #controls h2:first-child { margin-top: 0; }
-
-
         #controls button {
-            display: block;
-            width: 100%;
-            padding: 10px 15px; /* Slightly smaller padding for more buttons */
-            margin-bottom: 8px;
-            background-color: var(--secondary-color);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.95em;
+            display: block; width: 100%; padding: 10px 15px; margin-bottom: 8px;
+            background-color: var(--secondary-color); color: white; border: none;
+            border-radius: 5px; cursor: pointer; font-size: 0.95em;
             transition: background-color 0.3s ease, transform 0.1s ease;
         }
         #controls button.special-action { background-color: var(--accent-color); }
         #controls button:hover { background-color: #45c9b0; }
         #controls button.special-action:hover { background-color: #d8931e; }
         #controls button:active { transform: scale(0.98); }
-
         #controls .connect-mode-info {
             margin-top: 15px; padding: 10px; background-color: #eef;
             border-radius: 4px; font-size: 0.9em;
         }
         #controls .connect-mode-info strong { color: var(--accent-color); }
 
-        #workspace-container { flex-grow: 1; position: relative; background-color: var(--bg-color); overflow: auto; padding: 10px; }
+        #workspace-container {
+            flex-grow: 1; position: relative; background-color: var(--bg-color);
+            overflow: auto; padding: 10px;
+        }
         #workspace {
             position: relative; width: 3000px; height: 2500px;
             background-image:
-                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
-            background-size: 20px 20px; border: 1px solid var(--border-color);
+                linear-gradient(var(--grid-line-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line-color) 1px, transparent 1px);
+            background-size: var(--grid-size) var(--grid-size); /* Use CSS variable for grid size */
+            border: 1px solid var(--border-color);
         }
         #connection-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #connection-svg path { fill: none; } /* Paths are just strokes */
+
 
         .block {
-            position: absolute; min-width: 160px; min-height: 90px;
+            position: absolute; /* min-width/height will be set by JS to align with grid */
             background-color: var(--block-bg); border: 2px solid var(--border-color);
             border-radius: 8px; box-shadow: 3px 3px 8px var(--shadow-color);
             cursor: grab; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; padding: 15px 20px; /* More horizontal padding */
+            align-items: center; justify-content: center; padding: 10px; /* Padding consistent with grid */
             user-select: none; text-align: center; font-size: 0.9em; box-sizing: border-box;
+            transition: left 0.1s ease-out, top 0.1s ease-out; /* Smooth snap */
         }
         .block:active { cursor: grabbing; box-shadow: 5px 5px 15px rgba(0,0,0,0.2); }
 
@@ -114,8 +95,8 @@
         .heat-user { border-left: 5px solid var(--cold-water-color); }
         .sensor { border-left: 5px solid var(--info-signal-color); }
         .power-source { border-left: 5px solid var(--power-color); }
-        .custom-block { border-left: 5px solid var(--accent-color); } /* Added this for consistency */
-        .text-block { background-color: #f9f9f9; border: 2px dashed var(--border-color); min-height: 40px; min-width: 100px; font-style: italic; }
+        .custom-block { border-left: 5px solid var(--accent-color); }
+        .text-block { background-color: #f9f9f9; border: 2px dashed var(--border-color); font-style: italic; }
         
         .block-title { font-weight: bold; margin-bottom: 8px; font-size: 1em; }
         .block-label { font-size: 0.85em; color: #555; white-space: pre-wrap; margin-top: 5px; }
@@ -130,7 +111,7 @@
 
         .port {
             position: absolute; width: 16px; height: 16px; border: 1px solid #555;
-            border-radius: 50%; cursor: pointer; box-sizing: border-box; z-index: 1010; /* Above block content slightly */
+            border-radius: 50%; cursor: pointer; box-sizing: border-box; z-index: 1010;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .port:hover { transform: scale(1.3); box-shadow: 0 0 5px var(--accent-color); }
@@ -149,7 +130,7 @@
         }
         .port:hover .port-label-tip { visibility: visible; opacity: 1; }
 
-        /* Modal Styles */
+        /* Modal Styles - unchanged */
         .modal {
             display: none; position: fixed; z-index: 2000; left: 0; top: 0;
             width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6);
@@ -164,7 +145,6 @@
         .modal-header h2 { margin: 0; color: var(--primary-color); }
         .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .close-button:hover, .close-button:focus { color: black; text-decoration: none; }
-        
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
         .form-group input[type="text"], .form-group input[type="number"], .form-group select {
@@ -177,13 +157,11 @@
         }
         .port-editor-row input, .port-editor-row select { flex-grow: 1; min-width: 80px; }
         .port-editor-row button { padding: 5px 10px; font-size: 0.8em; background-color: #e74c3c; }
-
-        #customPortsContainer .form-group { flex-basis: 22%; } /* Adjust for smaller inputs in a row */
-
+        #customPortsContainer .form-group { flex-basis: 22%; }
     </style>
 </head>
 <body>
-    <div class="header">Dynamic Heating & Power System Visualizer</div>
+    <div class="header">Grid-Based System Visualizer</div>
     <div class="main-container">
         <div id="controls">
             <h2>Standard Components</h2>
@@ -197,9 +175,7 @@
             
             <h3>Custom Components</h3>
             <button id="openBlockEditorBtn" class="special-action" onclick="openBlockEditor()">Create Custom Block</button>
-            <div id="customBlockButtonsContainer">
-                <!-- Custom block buttons will be added here -->
-            </div>
+            <div id="customBlockButtonsContainer"></div>
 
             <h2>Connections</h2>
             <button id="connectButton" onclick="toggleConnectMode()">Start Connecting</button>
@@ -216,7 +192,6 @@
         </div>
     </div>
 
-    <!-- Block Editor Modal -->
     <div id="blockEditorModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -224,18 +199,24 @@
                 <span class="close-button" onclick="closeBlockEditor()">&times;</span>
             </div>
             <div class="form-group">
-                <label for="customBlockTitleInput">Block Title (e.g., "My Smart Valve"):</label>
+                <label for="customBlockTitleInput">Block Title:</label>
                 <input type="text" id="customBlockTitleInput" placeholder="Visible title of the block">
             </div>
             <div class="form-group">
-                <label for="customBlockTypeIDInput">Block Type ID (e.g., "my_smart_valve"):</label>
+                <label for="customBlockTypeIDInput">Block Type ID:</label>
                 <input type="text" id="customBlockTypeIDInput" placeholder="Unique ID, no spaces/special chars">
+            </div>
+            <div class="form-group">
+                <label for="customBlockWidthInput">Block Width (multiples of grid, e.g., 6):</label>
+                <input type="number" id="customBlockWidthInput" value="8" min="2" step="1">
+            </div>
+             <div class="form-group">
+                <label for="customBlockHeightInput">Block Height (multiples of grid, e.g., 4):</label>
+                <input type="number" id="customBlockHeightInput" value="5" min="2" step="1">
             </div>
 
             <h3>Ports:</h3>
-            <div id="customPortsContainer">
-                <!-- Port editor rows will be added here -->
-            </div>
+            <div id="customPortsContainer"></div>
             <button onclick="addPortToEditorConfig()" style="margin-top:10px; background-color: var(--primary-color);">Add Port</button>
             
             <hr style="margin: 20px 0;">
@@ -244,19 +225,22 @@
     </div>
 
     <script>
+        const GRID_SIZE = 20; // px
+        document.documentElement.style.setProperty('--grid-size', `${GRID_SIZE}px`); // Make it available to CSS
+
         const workspace = document.getElementById('workspace');
         const svgCanvas = document.getElementById('connection-svg');
         const connectButton = document.getElementById('connectButton');
         const connectModeInfo = document.getElementById('connectModeInfo');
-        const workspaceContainer = document.getElementById('workspace-container'); // Needed for scroll reference now
+        const workspaceContainer = document.getElementById('workspace-container');
         
-        // Modal elements
         const blockEditorModal = document.getElementById('blockEditorModal');
         const customBlockTitleInput = document.getElementById('customBlockTitleInput');
         const customBlockTypeIDInput = document.getElementById('customBlockTypeIDInput');
+        const customBlockWidthInput = document.getElementById('customBlockWidthInput');
+        const customBlockHeightInput = document.getElementById('customBlockHeightInput');
         const customPortsContainer = document.getElementById('customPortsContainer');
         const customBlockButtonsContainer = document.getElementById('customBlockButtonsContainer');
-
 
         let blocks = [];
         let connections = [];
@@ -272,8 +256,8 @@
 
         const PREDEFINED_BLOCK_DEFINITIONS = {
             'heat-pump': {
-                title: "♨️ Heat Pump",
-                ports: [
+                title: "♨️ Heat Pump", width: 8, height: 5, // in grid units
+                ports: [ /* Same ports as before */
                     { id: 'hw_out', label: 'Hot Water Out', type: 'hot-water', side: 'right', align: 0.25 },
                     { id: 'cw_in', label: 'Cold Water In', type: 'cold-water', side: 'right', align: 0.75 },
                     { id: 'power_in', label: 'Power In', type: 'power', side: 'bottom', align: 0.5 },
@@ -281,137 +265,121 @@
                 ]
             },
             'buffer': {
-                title: "🔋 Buffer Tank",
-                ports: [
+                title: "🔋 Buffer Tank", width: 6, height: 8,
+                ports: [ /* Same ports */
                     { id: 'hw_in_top', label: 'Hot In (Top)', type: 'hot-water', side: 'left', align: 0.2 },
                     { id: 'hw_out_top', label: 'Hot Out (Top)', type: 'hot-water', side: 'right', align: 0.2 },
                     { id: 'cw_in_bottom', label: 'Cold In (Bottom)', type: 'cold-water', side: 'left', align: 0.8 },
                     { id: 'cw_out_bottom', label: 'Cold Out (Bottom)', type: 'cold-water', side: 'right', align: 0.8 },
                 ]
             },
-            'input-source': { title: "⚡ Input Source", ports: [ { id: 'hw_out', label: 'Hot Flow Out', type: 'hot-water', side: 'right', align: 0.5 } ] },
+            'input-source': { title: "⚡ Input Source", width: 6, height: 3, ports: [ { id: 'hw_out', label: 'Hot Flow Out', type: 'hot-water', side: 'right', align: 0.5 } ] },
             'heat-user': {
-                title: "🔥 Heat User",
-                ports: [
+                title: "🔥 Heat User", width: 7, height: 4,
+                ports: [ /* Same ports */
                     { id: 'hw_in', label: 'Hot Supply', type: 'hot-water', side: 'left', align: 0.25 },
                     { id: 'cw_out', label: 'Cold Return', type: 'cold-water', side: 'left', align: 0.75 },
                     { id: 'power_in', label: 'Power In (Fan/Valve)', type: 'power', side: 'bottom', align: 0.5 },
                 ]
             },
-            'sensor': { title: "🌡️ Sensor", ports: [ { id: 'data_out', label: 'Measured Value', type: 'data-signal', side: 'right', align: 0.5 } ] },
-            'power-source': { title: "💡 Power Source", ports: [ { id: 'power_out', label: 'Power Out', type: 'power', side: 'right', align: 0.5 } ] },
-            'text-block': { title: "📝 Text Label", ports: [] }
+            'sensor': { title: "🌡️ Sensor", width: 5, height: 3, ports: [ { id: 'data_out', label: 'Measured Value', type: 'data-signal', side: 'right', align: 0.5 } ] },
+            'power-source': { title: "💡 Power Source", width: 6, height: 3, ports: [ { id: 'power_out', label: 'Power Out', type: 'power', side: 'right', align: 0.5 } ] },
+            'text-block': { title: "📝 Text Label", width: 6, height: 2, ports: [] }
         };
         
-        let userDefinedBlockDefinitions = {}; // Stores custom block definitions
+        let userDefinedBlockDefinitions = {};
 
-        function getBlockDefinition(type) {
-            return PREDEFINED_BLOCK_DEFINITIONS[type] || userDefinedBlockDefinitions[type];
-        }
+        function getBlockDefinition(type) { return PREDEFINED_BLOCK_DEFINITIONS[type] || userDefinedBlockDefinitions[type]; }
 
-        // --- Block Editor Functions ---
+        // --- Block Editor ---
         function openBlockEditor() {
             blockEditorModal.style.display = "flex";
-            customBlockTitleInput.value = "";
-            customBlockTypeIDInput.value = "";
-            customPortsContainer.innerHTML = ""; // Clear previous ports
-            addPortToEditorConfig(); // Add one port row by default
+            customBlockTitleInput.value = ""; customBlockTypeIDInput.value = "";
+            customBlockWidthInput.value = 8; customBlockHeightInput.value = 5;
+            customPortsContainer.innerHTML = ""; addPortToEditorConfig();
         }
         function closeBlockEditor() { blockEditorModal.style.display = "none"; }
-
         function addPortToEditorConfig() {
-            const portRow = document.createElement('div');
-            portRow.className = 'port-editor-row';
+            const portRow = document.createElement('div'); portRow.className = 'port-editor-row';
             portRow.innerHTML = `
-                <input type="text" placeholder="Port Label (e.g. Hot Out)" class="port-label-input">
+                <input type="text" placeholder="Port Label" class="port-label-input">
                 <select class="port-type-select">
-                    <option value="hot-water">Hot Water</option>
-                    <option value="cold-water">Cold Water</option>
-                    <option value="data-signal">Data Signal</option>
-                    <option value="power">Power</option>
+                    <option value="hot-water">Hot Water</option><option value="cold-water">Cold Water</option>
+                    <option value="data-signal">Data Signal</option><option value="power">Power</option>
                 </select>
                 <select class="port-side-select">
-                    <option value="top">Top</option>
-                    <option value="bottom">Bottom</option>
-                    <option value="left">Left</option>
-                    <option value="right">Right</option>
+                    <option value="top">Top</option><option value="bottom">Bottom</option>
+                    <option value="left">Left</option><option value="right">Right</option>
                 </select>
                 <input type="number" placeholder="Align (0-1)" class="port-align-input" min="0" max="1" step="0.01" value="0.5">
-                <button onclick="this.parentElement.remove()">Remove</button>
+                <button onclick="this.parentElement.remove()">X</button>
             `;
             customPortsContainer.appendChild(portRow);
         }
-
         function saveCustomBlock() {
             const title = customBlockTitleInput.value.trim();
             const typeId = customBlockTypeIDInput.value.trim().replace(/\s+/g, '_').toLowerCase();
+            const width = parseInt(customBlockWidthInput.value);
+            const height = parseInt(customBlockHeightInput.value);
 
-            if (!title || !typeId) {
-                alert("Block Title and Type ID are required.");
-                return;
-            }
-            if (getBlockDefinition(typeId)) {
-                alert(`Block Type ID "${typeId}" already exists. Choose a unique ID.`);
-                return;
-            }
+            if (!title || !typeId) { alert("Title and Type ID required."); return; }
+            if (getBlockDefinition(typeId)) { alert(`ID "${typeId}" already exists.`); return; }
+            if (isNaN(width) || width < 2 || isNaN(height) || height < 2) { alert("Width/Height must be at least 2 grid units."); return;}
 
-            const ports = [];
-            const portRows = customPortsContainer.querySelectorAll('.port-editor-row');
-            let portIdCounter = 0;
-            for (const row of portRows) {
+            const ports = []; let portIdCounter = 0;
+            for (const row of customPortsContainer.querySelectorAll('.port-editor-row')) {
                 const label = row.querySelector('.port-label-input').value.trim();
                 const type = row.querySelector('.port-type-select').value;
                 const side = row.querySelector('.port-side-select').value;
                 const align = parseFloat(row.querySelector('.port-align-input').value);
-
-                if (!label) {
-                    alert("All ports must have a label.");
-                    return;
-                }
-                if (isNaN(align) || align < 0 || align > 1) {
-                    alert("Port alignment must be a number between 0 and 1.");
-                    return;
-                }
-                ports.push({ id: `customport_${portIdCounter++}`, label, type, side, align });
+                if (!label) { alert("All ports need a label."); return; }
+                if (isNaN(align) || align < 0 || align > 1) { alert("Align must be 0-1."); return; }
+                ports.push({ id: `cp_${portIdCounter++}`, label, type, side, align });
             }
-
-            userDefinedBlockDefinitions[typeId] = { title, ports, isCustom: true };
-            updateCustomBlockButtons();
-            closeBlockEditor();
-            alert(`Custom block "${title}" saved!`);
+            userDefinedBlockDefinitions[typeId] = { title, width, height, ports, isCustom: true };
+            updateCustomBlockButtons(); closeBlockEditor(); alert(`Block "${title}" saved!`);
         }
-        
         function updateCustomBlockButtons() {
-            customBlockButtonsContainer.innerHTML = ""; // Clear existing
+            customBlockButtonsContainer.innerHTML = "";
             for (const typeId in userDefinedBlockDefinitions) {
                 const def = userDefinedBlockDefinitions[typeId];
-                const button = document.createElement('button');
-                button.textContent = `Add ${def.title}`;
-                button.onclick = () => addBlock(typeId);
-                // Style custom buttons differently if desired
-                // button.style.backgroundColor = '#your_custom_color'; 
-                customBlockButtonsContainer.appendChild(button);
+                const btn = document.createElement('button');
+                btn.textContent = `Add ${def.title}`; btn.onclick = () => addBlock(typeId);
+                customBlockButtonsContainer.appendChild(btn);
             }
         }
 
+        // --- Snapping ---
+        function snapToGrid(value) { return Math.round(value / GRID_SIZE) * GRID_SIZE; }
 
-        // --- Core Visualizer Logic (Mostly same as before, with minor adjustments) ---
-
-        function getPortPosition(blockElement, portDef, portElementSize = 16) {
-            const blockWidth = blockElement.offsetWidth;
-            const blockHeight = blockElement.offsetHeight;
+        // --- Port Positioning (Relative to block, in pixels) ---
+        function getPortPixelPositionOnBlock(blockDef, portDef, portElementSize = 16) {
+            const blockWidthPx = blockDef.width * GRID_SIZE;
+            const blockHeightPx = blockDef.height * GRID_SIZE;
             const offset = portElementSize / 2;
             let x, y;
+            // Ports are positioned slightly outside the block's main body for better line rendering
+            const portMargin = GRID_SIZE / 2; // How far "out" the port connection point is
+
             switch (portDef.side) {
-                case 'top':    x = blockWidth * portDef.align - offset; y = -offset -2; break; // -2 to bring slightly outside
-                case 'bottom': x = blockWidth * portDef.align - offset; y = blockHeight - offset + 2; break; // +2
-                case 'left':   x = -offset -2 ; y = blockHeight * portDef.align - offset; break; // -2
-                case 'right':  x = blockWidth - offset + 2; y = blockHeight * portDef.align - offset; break; // +2
-                default:       x = blockWidth / 2 - offset; y = blockHeight / 2 - offset;
+                case 'top':    x = blockWidthPx * portDef.align; y = -portMargin; break;
+                case 'bottom': x = blockWidthPx * portDef.align; y = blockHeightPx + portMargin; break;
+                case 'left':   x = -portMargin; y = blockHeightPx * portDef.align; break;
+                case 'right':  x = blockWidthPx + portMargin; y = blockHeightPx * portDef.align; break;
+                default:       x = blockWidthPx / 2; y = blockHeightPx / 2;
             }
-            return { x, y };
+            // For display of the port dot itself, bring it back onto the edge:
+            let displayX = x, displayY = y;
+             switch (portDef.side) {
+                case 'top':    displayX = blockWidthPx * portDef.align - offset; displayY = -offset; break;
+                case 'bottom': displayX = blockWidthPx * portDef.align - offset; displayY = blockHeightPx - offset; break;
+                case 'left':   displayX = -offset; displayY = blockHeightPx * portDef.align - offset; break;
+                case 'right':  displayX = blockWidthPx - offset; displayY = blockHeightPx * portDef.align - offset; break;
+            }
+            return { x, y, displayX, displayY }; // x,y for line connection; displayX,Y for port dot
         }
-        
+
+
         function addBlock(type) {
             const definition = getBlockDefinition(type);
             if (!definition) { console.error("Unknown block type:", type); return; }
@@ -419,77 +387,61 @@
             const id = `block-${nextBlockId++}`;
             let userLabel = "";
             if (type === 'text-block') {
-                userLabel = prompt("Enter text for the label:", "My Custom Text");
-                if (userLabel === null) return;
-            } else if (type !== 'power-source' && !definition.isCustom && definition.ports.length > 0) { // Don't prompt for power source or custom by default
-                 const defaultLabel = prompt(`Optional label for ${definition.title}:`, "");
+                userLabel = prompt("Label:", "My Text"); if (userLabel === null) return;
+            } else if (type !== 'power-source' && !definition.isCustom && (definition.ports || []).length > 0) {
+                 const defaultLabel = prompt(`Label for ${definition.title}:`, "");
                  if (defaultLabel !== null && defaultLabel.trim() !== "") userLabel = defaultLabel;
             }
-
 
             const blockDiv = document.createElement('div');
             blockDiv.id = id;
             blockDiv.className = `block ${type} ${definition.isCustom ? 'custom-block' : ''}`;
-            // Removed explicit style setting for custom-block border, rely on CSS class from line 139
+            blockDiv.style.width = `${definition.width * GRID_SIZE}px`;
+            blockDiv.style.height = `${definition.height * GRID_SIZE}px`;
             
-            const titleSpan = document.createElement('span');
-            titleSpan.className = 'block-title';
-            titleSpan.textContent = definition.title;
-            blockDiv.appendChild(titleSpan);
-
+            const titleSpan = document.createElement('span'); titleSpan.className = 'block-title';
+            titleSpan.textContent = definition.title; blockDiv.appendChild(titleSpan);
             if (userLabel) {
-                const labelSpan = document.createElement('span');
-                labelSpan.className = 'block-label';
-                labelSpan.textContent = userLabel;
-                blockDiv.appendChild(labelSpan);
+                const labelSpan = document.createElement('span'); labelSpan.className = 'block-label';
+                labelSpan.textContent = userLabel; blockDiv.appendChild(labelSpan);
             }
             
-            const initialX = 50 + (blocks.length % 8) * 190; 
-            const initialY = 50 + Math.floor(blocks.length / 8) * 140;
-            blockDiv.style.left = `${initialX}px`;
-            blockDiv.style.top = `${initialY}px`;
+            // Initial position snapping
+            const initialX = snapToGrid(50 + (blocks.length % 6) * (definition.width + 2) * GRID_SIZE); 
+            const initialY = snapToGrid(50 + Math.floor(blocks.length / 6) * (definition.height + 2) * GRID_SIZE);
+            blockDiv.style.left = `${initialX}px`; blockDiv.style.top = `${initialY}px`;
 
-            const deleteBtn = document.createElement('span');
-            deleteBtn.className = 'delete-btn';
-            deleteBtn.innerHTML = '&times;';
-            deleteBtn.onclick = (e) => { e.stopPropagation(); deleteBlock(id); };
+            const deleteBtn = document.createElement('span'); deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '&times;'; deleteBtn.onclick = (e) => { e.stopPropagation(); deleteBlock(id); };
             blockDiv.appendChild(deleteBtn);
-            
             workspace.appendChild(blockDiv);
 
-            const blockData = { id, element: blockDiv, type, x: initialX, y: initialY, ports: [], connections: [] };
+            const blockData = { id, element: blockDiv, type, definition, x: initialX, y: initialY, ports: [], connections: [] };
 
             (definition.ports || []).forEach(portDef => {
                 const portId = `${id}_${portDef.id}`;
                 const portElement = document.createElement('div');
-                portElement.id = portId;
-                portElement.className = `port ${portDef.type}`;
-                
-                const pos = getPortPosition(blockDiv, portDef);
-                portElement.style.left = `${pos.x}px`;
-                portElement.style.top = `${pos.y}px`;
-
-                const labelTip = document.createElement('span');
-                labelTip.className = 'port-label-tip';
-                labelTip.textContent = portDef.label;
-                portElement.appendChild(labelTip);
-
+                portElement.id = portId; portElement.className = `port ${portDef.type}`;
+                const pos = getPortPixelPositionOnBlock(definition, portDef); // Use definition here for initial sizing
+                portElement.style.left = `${pos.displayX}px`; // Use displayX/Y for the dot
+                portElement.style.top = `${pos.displayY}px`;
+                const labelTip = document.createElement('span'); labelTip.className = 'port-label-tip';
+                labelTip.textContent = portDef.label; portElement.appendChild(labelTip);
                 portElement.onclick = (e) => { e.stopPropagation(); handlePortClick(blockData, portDef, portElement); };
                 blockDiv.appendChild(portElement);
                 blockData.ports.push({ id: portDef.id, fullId: portId, definition: portDef, element: portElement, connectedTo: null });
             });
-            
-            blocks.push(blockData);
-            makeDraggable(blockDiv); 
+            blocks.push(blockData); makeDraggable(blockDiv, blockData); 
         }
 
-        function makeDraggable(element) {
+        function makeDraggable(element, blockData) { // Pass blockData for snapping
             element.addEventListener('mousedown', (e) => {
                 if (e.button !== 0 || e.target.classList.contains('delete-btn') || e.target.classList.contains('port')) return;
                 e.preventDefault(); isDragging = true; dragTarget = element; dragTarget.lastDragTime = 0; 
                 initialMouseX = e.clientX; initialMouseY = e.clientY;
                 initialElementLeft = dragTarget.offsetLeft; initialElementTop = dragTarget.offsetTop;   
                 dragTarget.style.cursor = 'grabbing'; dragTarget.style.zIndex = "1000"; 
+                dragTarget.style.transition = 'none'; // Disable transition during drag
             });
         }
 
@@ -498,21 +450,35 @@
             e.preventDefault(); 
             const deltaX = e.clientX - initialMouseX, deltaY = e.clientY - initialMouseY;
             let newX = initialElementLeft + deltaX, newY = initialElementTop + deltaY;
-            newX = Math.max(0, Math.min(newX, workspace.offsetWidth - dragTarget.offsetWidth));
-            newY = Math.max(0, Math.min(newY, workspace.offsetHeight - dragTarget.offsetHeight));
+            // No snapping during move for smoother feel, only on drop
             dragTarget.style.left = `${newX}px`; dragTarget.style.top = `${newY}px`;
             const blockData = blocks.find(b => b.id === dragTarget.id);
-            if (blockData) { blockData.x = newX; blockData.y = newY; updateConnectionsForBlock(blockData.id); }
+            if (blockData) { // Temporarily update for live line redraw, will be snapped on mouseup
+                blockData.x = newX; blockData.y = newY; updateConnectionsForBlock(blockData.id);
+            }
         });
 
         document.addEventListener('mouseup', () => {
             if (isDragging && dragTarget) {
                 dragTarget.style.cursor = 'grab'; dragTarget.style.zIndex = ''; 
                 dragTarget.lastDragTime = new Date().getTime();
+                
+                // Snap to grid on mouseup
+                const blockData = blocks.find(b => b.id === dragTarget.id);
+                if (blockData) {
+                    blockData.x = snapToGrid(dragTarget.offsetLeft);
+                    blockData.y = snapToGrid(dragTarget.offsetTop);
+                    dragTarget.style.left = `${blockData.x}px`;
+                    dragTarget.style.top = `${blockData.y}px`;
+                    updateConnectionsForBlock(blockData.id);
+                }
+                dragTarget.style.transition = 'left 0.1s ease-out, top 0.1s ease-out'; // Re-enable transition
+
                 isDragging = false; dragTarget = null;
             }
         });
         
+        // toggleConnectMode and arePortsCompatible - unchanged
         function toggleConnectMode() {
             connectMode = !connectMode;
             const rootStyle = getComputedStyle(document.documentElement); 
@@ -527,13 +493,13 @@
                 if (firstPortToConnect) { firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; }
             }
         }
-
         function arePortsCompatible(port1Def, port2Def) { return port1Def.type === port2Def.type; }
+
 
         function handlePortClick(blockData, portDef, portElement) {
             if (!connectMode || (new Date().getTime() - (dragTarget?.lastDragTime || 0) < 100)) return;
-            const portData = blockData.ports.find(p => p.fullId === portElement.id);
-            if (portData && portData.connectedTo) { alert(`Port ${portDef.label} is already connected.`); return; }
+            const portDataObj = blockData.ports.find(p => p.fullId === portElement.id); // Renamed to portDataObj
+            if (portDataObj && portDataObj.connectedTo) { alert(`Port ${portDef.label} is already connected.`); return; }
 
             if (!firstPortToConnect) {
                 firstPortToConnect = { blockData, portDef, portElement };
@@ -556,31 +522,27 @@
             }
         }
         
-        function getPortAbsolutePosition(blockId, portFullId) {
+        // Get global coordinates of the port's connection point
+        function getPortAbsoluteConnectionPoint(blockId, portFullId) {
             const block = blocks.find(b => b.id === blockId);
             if (!block) return null;
-            const port = block.ports.find(p => p.fullId === portFullId);
-            if (!port || !port.element) return null;
+            const portObj = block.ports.find(p => p.fullId === portFullId); // Renamed to portObj
+            if (!portObj || !portObj.element) return null;
 
-            const portRect = port.element.getBoundingClientRect();
-            // The workspaceRect should be relative to the document for consistent BoundingClientRect calculations
-            const workspaceRect = workspace.getBoundingClientRect(); 
+            const portPosOnBlock = getPortPixelPositionOnBlock(block.definition, portObj.definition);
             
-            // Port center relative to document: portRect.left + portRect.width / 2
-            // Workspace top-left relative to document: workspaceRect.left
-            // So, port center relative to workspace top-left (visual, pre-scroll):
-            // (portRect.left + portRect.width / 2) - workspaceRect.left
-            // Then add workspace's internal scroll to get the coordinate within the full workspace content
-            const x = (portRect.left + portRect.width / 2) - workspaceRect.left + workspaceContainer.scrollLeft;
-            const y = (portRect.top + portRect.height / 2) - workspaceRect.top + workspaceContainer.scrollTop;
+            // Connection point is block's top-left + port's connection point offset from block's top-left
+            const x = block.x + portPosOnBlock.x;
+            const y = block.y + portPosOnBlock.y;
             
-            return { x, y };
+            return { x, y, side: portObj.definition.side }; // Also return side for routing
         }
 
         function createConnection(port1Info, port2Info) {
             const connectionId = `conn-${nextConnectionId++}`;
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.id = connectionId;
+            // Use path instead of line
+            const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            pathElement.id = connectionId;
             let strokeColor = 'var(--text-color)', strokeDashArray = "none", strokeWidth = '3';
 
             switch (port1Info.portDef.type) {
@@ -589,16 +551,17 @@
                 case 'data-signal':  strokeColor = 'var(--info-signal-color)'; strokeDashArray = "5,5"; break;
                 case 'power':        strokeColor = 'var(--power-color)'; strokeWidth = '4'; break;
             }
-            line.setAttribute('stroke', strokeColor);
-            line.setAttribute('stroke-width', strokeWidth);
-            line.setAttribute('stroke-dasharray', strokeDashArray);
-            if (port1Info.portDef.type !== 'data-signal') line.setAttribute('marker-end', 'url(#arrowhead)');
+            pathElement.setAttribute('stroke', strokeColor);
+            pathElement.setAttribute('stroke-width', strokeWidth);
+            pathElement.setAttribute('stroke-dasharray', strokeDashArray);
+            pathElement.setAttribute('fill', 'none'); // Important for paths
+            if (port1Info.portDef.type !== 'data-signal') pathElement.setAttribute('marker-end', 'url(#arrowhead)');
 
-            svgCanvas.appendChild(line);
+            svgCanvas.appendChild(pathElement);
             const connectionData = {
                 id: connectionId, type: port1Info.portDef.type,
                 fromBlockId: port1Info.blockData.id, fromPortFullId: port1Info.portElement.id,
-                toBlockId: port2Info.blockData.id, toPortFullId: port2Info.portElement.id, element: line
+                toBlockId: port2Info.blockData.id, toPortFullId: port2Info.portElement.id, element: pathElement
             };
             connections.push(connectionData);
             port1Info.blockData.connections.push(connectionId);
@@ -607,26 +570,91 @@
             const p2 = port2Info.blockData.ports.find(p=>p.fullId === port2Info.portElement.id);
             if(p1) p1.connectedTo = { blockId: port2Info.blockData.id, portId: port2Info.portDef.id };
             if(p2) p2.connectedTo = { blockId: port1Info.blockData.id, portId: port1Info.portDef.id };
-            updateConnectionLine(connectionData);
+            updateConnectionPath(connectionData); // Changed from updateConnectionLine
         }
 
-        function updateConnectionLine(connectionData) {
-            const pos1 = getPortAbsolutePosition(connectionData.fromBlockId, connectionData.fromPortFullId);
-            const pos2 = getPortAbsolutePosition(connectionData.toBlockId, connectionData.toPortFullId);
-            if (!pos1 || !pos2 || !connectionData.element) return;
-            connectionData.element.setAttribute('x1', String(pos1.x));
-            connectionData.element.setAttribute('y1', String(pos1.y));
-            connectionData.element.setAttribute('x2', String(pos2.x));
-            connectionData.element.setAttribute('y2', String(pos2.y));
+        // --- Orthogonal Path Drawing ---
+        function getOrthogonalPath(p1, p2) {
+            const path = [`M ${p1.x} ${p1.y}`];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const G = GRID_SIZE; // Gutter or offset from port
+
+            // Simple HVH or VHV router. More complex routers exist.
+            // This tries to exit the port orthogonally for a short distance first.
+
+            if (p1.side === 'left' || p1.side === 'right') { // Start horizontally
+                const midX = p1.x + (dx / 2);
+                path.push(`H ${midX}`);
+                path.push(`V ${p2.y}`);
+                path.push(`H ${p2.x}`);
+            } else { // Start vertically (top or bottom)
+                const midY = p1.y + (dy / 2);
+                path.push(`V ${midY}`);
+                path.push(`H ${p2.x}`);
+                path.push(`V ${p2.y}`);
+            }
+            return path.join(' ');
+        }
+        
+        // More advanced simple orthogonal router (L-shape or S-shape)
+        function getSmartOrthogonalPath(p1, p2) {
+            const path = [`M ${p1.x} ${p1.y}`];
+            const G = GRID_SIZE; // Gutter size for exiting port
+
+            let x1 = p1.x, y1 = p1.y;
+            let x2 = p2.x, y2 = p2.y;
+
+            // Determine initial direction based on port side
+            // And move out by G
+            if (p1.side === 'left') x1 -= G;
+            else if (p1.side === 'right') x1 += G;
+            else if (p1.side === 'top') y1 -= G;
+            else if (p1.side === 'bottom') y1 += G;
+            path.push(`L ${x1} ${y1}`);
+            
+            // Determine final approach direction based on port side
+            if (p2.side === 'left') x2 -= G;
+            else if (p2.side === 'right') x2 += G;
+            else if (p2.side === 'top') y2 -= G;
+            else if (p2.side === 'bottom') y2 += G;
+            // We will end with L x2 y2, then L p2.x p2.y
+
+            // Simple strategy: prefer horizontal then vertical, or vertical then horizontal.
+            // This doesn't handle block collisions.
+            if (p1.side === 'left' || p1.side === 'right') { // Prefer H-V-H
+                if (x1 !== x2) path.push(`L ${x1} ${y2}`); // Vertical segment to align y
+                if (y1 !== y2 && x1 === x2) {} // This case is tricky, means ports are aligned, need an S bend
+                // For simplicity, just go straight to x2 if y is already aligned.
+            } else { // Prefer V-H-V
+                if (y1 !== y2) path.push(`L ${x2} ${y1}`); // Horizontal segment to align x
+            }
+            
+            path.push(`L ${x2} ${y2}`); // Approach point
+            path.push(`L ${p2.x} ${p2.y}`); // Final connection to port
+            return path.join(' ');
+        }
+
+
+        function updateConnectionPath(connectionData) { // Renamed
+            const p1 = getPortAbsoluteConnectionPoint(connectionData.fromBlockId, connectionData.fromPortFullId);
+            const p2 = getPortAbsoluteConnectionPoint(connectionData.toBlockId, connectionData.toPortFullId);
+            
+            if (!p1 || !p2 || !connectionData.element) return;
+
+            // const pathString = getOrthogonalPath(p1, p2); // Simpler router
+            const pathString = getSmartOrthogonalPath(p1, p2); // Slightly more complex router
+            connectionData.element.setAttribute('d', pathString);
         }
 
         function updateConnectionsForBlock(blockId) {
             connections.forEach(conn => {
-                if (conn.fromBlockId === blockId || conn.toBlockId === blockId) updateConnectionLine(conn);
+                if (conn.fromBlockId === blockId || conn.toBlockId === blockId) updateConnectionPath(conn); // Renamed
             });
         }
 
-        function deleteBlock(blockId) {
+        // DeleteBlock and ClearWorkspace - largely unchanged, ensure connections are cleared
+         function deleteBlock(blockId) {
             const blockIndex = blocks.findIndex(b => b.id === blockId);
             if (blockIndex === -1) return;
             const blockData = blocks[blockIndex];
@@ -648,7 +676,6 @@
             if (blockData.element && blockData.element.parentNode === workspace) workspace.removeChild(blockData.element);
             blocks.splice(blockIndex, 1);
         }
-
         function clearWorkspace() {
             if (!confirm("Clear workspace? This cannot be undone.")) return;
             blocks.forEach(block => { if (block.element && block.element.parentNode === workspace) workspace.removeChild(block.element); });
@@ -659,13 +686,14 @@
             if (firstPortToConnect) { if(firstPortToConnect.portElement) firstPortToConnect.portElement.classList.remove('selected-for-connection'); firstPortToConnect = null; }
         }
 
+
         function setupSvgDefs() {
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
             const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
             marker.setAttribute('id', 'arrowhead');
             marker.setAttribute('markerWidth', '10'); marker.setAttribute('markerHeight', '7');
-            marker.setAttribute('refX', '8'); marker.setAttribute('refY', '3.5');
-            marker.setAttribute('orient', 'auto-start-reverse');
+            marker.setAttribute('refX', '8'); marker.setAttribute('refY', '3.5'); // Adjusted refX for path end
+            marker.setAttribute('orient', 'auto'); // 'auto' works well for paths
             const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
             polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
             polygon.setAttribute('fill', 'currentColor'); 
@@ -674,20 +702,10 @@
         }
 
         // Initialize
-        setupSvgDefs();
-        updateCustomBlockButtons(); // In case any are loaded/persisted in future
-        // Close modal if escape key is pressed
-        window.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && blockEditorModal.style.display === "flex") {
-                closeBlockEditor();
-            }
-        });
-        // Close modal if clicked outside content
-        window.onclick = function(event) {
-            if (event.target == blockEditorModal) {
-                closeBlockEditor();
-            }
-        }
+        setupSvgDefs(); updateCustomBlockButtons();
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && blockEditorModal.style.display === "flex") closeBlockEditor(); });
+        window.onclick = (e) => { if (e.target == blockEditorModal) closeBlockEditor(); }
+
     </script>
 </body>
 </html>
